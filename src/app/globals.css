@@ -1,2 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --color-ipl-bg: #0b0f19; /* Very dark navy, almost black */
+  --color-ipl-card: #151e2e; /* Slightly lighter navy for cards */
+  --color-ipl-gold: #eab308; /* The classic IPL trophy gold */
+  --color-ipl-gold-hover: #ca8a04;
+  --color-ipl-accent: #3b82f6; /* A sports-tech blue for highlights */
+  --color-ipl-red: #ef4444; /* For the error toasts */
+  --color-pitch-green: #14532d; /* Dark grass green for the right panel */
+}
+
+body {
+  background-color: var(--color-ipl-bg);
+  color: white;
+}
