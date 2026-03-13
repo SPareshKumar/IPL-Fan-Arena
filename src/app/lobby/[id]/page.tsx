@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import DraftInterface from '@/src/components/DraftInterface'
+import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -11,27 +12,31 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // 1. Fetch Lobby details AND the connected Match details!
   const { data: lobby, error } = await supabase
     .from('lobbies')
-    .select('*, lobby_members!inner(user_id), matches(id, team1, team2)') // <-- Look at this relational magic!
+    .select('*, lobby_members!inner(user_id), matches(id, team1, team2)')
     .eq('id', id)
     .eq('lobby_members.user_id', user.id)
     .single()
-if (error) {
-    console.error("DATABASE JOIN ERROR:", error)
-  }
+
   if (error || !lobby) redirect('/dashboard')
 
-  // 2. Extract the match info safely
-  // @ts-ignore - Supabase types can be tricky with joined tables
+  // @ts-ignore
   const matchInfo = lobby.matches
 
-  // 3. Fetch ONLY the players playing in this specific match!
+  // --- NEW: Check if the user has ALREADY drafted a team ---
+  const { data: existingTeam } = await supabase
+    .from('user_teams')
+    .select('id')
+    .eq('lobby_id', lobby.id)
+    .eq('user_id', user.id)
+    .maybeSingle() // maybeSingle() prevents an error from throwing if no team is found
+
+  // Fetch players for the draft interface
   const { data: players } = await supabase
     .from('players')
     .select('*')
-    .in('team', [matchInfo.team1, matchInfo.team2]) // Filter by the two teams
+    .in('team', [matchInfo.team1, matchInfo.team2])
     .order('team') 
 
   return (
@@ -55,12 +60,21 @@ if (error) {
         </div>
       </header>
 
-      <DraftInterface 
-        players={players || []} 
-        lobbyType={lobby.lobby_type} 
-        lobbyId={lobby.id} 
-        targetId={matchInfo.id} 
-      />
+      {/* THE SMART ROUTER: Render Leaderboard OR Draft Interface */}
+      {existingTeam ? (
+        <LobbyLeaderboard 
+          lobbyId={lobby.id} 
+          targetId={matchInfo.id} 
+          currentUserId={user.id} 
+        />
+      ) : (
+        <DraftInterface 
+          players={players || []} 
+          lobbyType={lobby.lobby_type} 
+          lobbyId={lobby.id} 
+          targetId={matchInfo.id} 
+        />
+      )}
       
     </div>
   )
