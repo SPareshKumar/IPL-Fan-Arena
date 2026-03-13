@@ -5,7 +5,9 @@ import { createLobby } from '@/src/app/actions/lobby'
 import { PlusCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 
-export default function CreateLobbyModal() {
+type Match = { id: number; team1: string; team2: string; match_time: string }
+
+export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -69,6 +71,21 @@ export default function CreateLobbyModal() {
                 >
                   <option value="single">Single Match (5 Players)</option>
                   <option value="tournament">Tournament Window (11 Players)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Select Fixture</label>
+                <select 
+                  name="targetId" 
+                  required
+                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all"
+                >
+                  <option value="">-- Choose a Match --</option>
+                  {matches.map((match) => (
+                    <option key={match.id} value={match.id}>
+                      {match.team1} vs {match.team2} 
+                    </option>
+                  ))}
                 </select>
               </div>
 

@@ -11,26 +11,32 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch Lobby details
+  // 1. Fetch Lobby details AND the connected Match details!
   const { data: lobby, error } = await supabase
     .from('lobbies')
-    .select('*, lobby_members!inner(user_id)')
+    .select('*, lobby_members!inner(user_id), matches(id, team1, team2)') // <-- Look at this relational magic!
     .eq('id', id)
     .eq('lobby_members.user_id', user.id)
     .single()
-
+if (error) {
+    console.error("DATABASE JOIN ERROR:", error)
+  }
   if (error || !lobby) redirect('/dashboard')
 
-  // Fetch all players from the Master Roster!
+  // 2. Extract the match info safely
+  // @ts-ignore - Supabase types can be tricky with joined tables
+  const matchInfo = lobby.matches
+
+  // 3. Fetch ONLY the players playing in this specific match!
   const { data: players } = await supabase
     .from('players')
     .select('*')
-    .order('team') // Groups them nicely by team
+    .in('team', [matchInfo.team1, matchInfo.team2]) // Filter by the two teams
+    .order('team') 
 
   return (
     <div className="flex min-h-screen flex-col bg-ipl-bg text-white">
       
-      {/* TOP NAVIGATION BAR */}
       <header className="flex items-center justify-between border-b border-gray-800 bg-ipl-card p-4 shadow-md">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="text-gray-400 transition-colors hover:text-white">
@@ -38,7 +44,9 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           </Link>
           <div>
             <h1 className="text-xl font-bold text-ipl-gold">{lobby.name}</h1>
-            <span className="text-xs tracking-wider text-gray-400 uppercase">{lobby.lobby_type} Mode</span>
+            <span className="text-xs tracking-wider text-gray-400 uppercase">
+              {matchInfo.team1} vs {matchInfo.team2} • {lobby.lobby_type} Mode
+            </span>
           </div>
         </div>
         
@@ -47,8 +55,12 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         </div>
       </header>
 
-      {/* RENDER OUR NEW INTERACTIVE CLIENT COMPONENT */}
-      <DraftInterface players={players || []} lobbyType={lobby.lobby_type} lobbyId={lobby.id} />
+      <DraftInterface 
+        players={players || []} 
+        lobbyType={lobby.lobby_type} 
+        lobbyId={lobby.id} 
+        targetId={matchInfo.id} 
+      />
       
     </div>
   )

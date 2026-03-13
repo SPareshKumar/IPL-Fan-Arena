@@ -12,11 +12,13 @@ type Player = { id: number; name: string; team: string; role: string }
 export default function DraftInterface({ 
   players, 
   lobbyType,
-  lobbyId 
+  lobbyId,
+  targetId // <-- Add this new prop
 }: { 
   players: Player[]; 
-  lobbyType: string ;
-  lobbyId: string
+  lobbyType: string;
+  lobbyId: string;
+  targetId: number; // <-- Define its type
 }) {
   const [squad, setSquad] = useState<Player[]>([])
   const [captainId, setCaptainId] = useState<number | null>(null)
@@ -31,7 +33,8 @@ export default function DraftInterface({
     // Extract just the numbers (IDs) from the player objects
     const playerIds = squad.map(p => p.id)
     
-    const result = await lockTeam(lobbyId, playerIds, captainId)
+    // Pass the targetId right in the middle!
+    const result = await lockTeam(lobbyId, targetId, playerIds, captainId)
     
     if (result.error) {
       toast.error(result.error)

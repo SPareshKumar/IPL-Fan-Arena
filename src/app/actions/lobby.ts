@@ -12,6 +12,7 @@ export async function createLobby(formData: FormData) {
 
   const name = formData.get('name') as string
   const lobbyType = formData.get('type') as string
+  const targetId = formData.get('targetId') // <-- Grab the selected match ID
 
   if (!name || name.length < 3) return { error: 'Name must be at least 3 characters.' }
 
@@ -24,6 +25,7 @@ export async function createLobby(formData: FormData) {
     .insert({
       name,
       lobby_type: lobbyType,
+      target_id: parseInt(targetId as string), // <-- Save it as a number
       invite_code: inviteCode,
       created_by: user.id
     })

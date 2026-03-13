@@ -24,6 +24,12 @@ export default async function DashboardPage() {
   if (error) {
     console.error("Error fetching lobbies:", error)
   }
+  // Fetch upcoming matches for the Create Lobby modal
+  const { data: upcomingMatches } = await supabase
+    .from('matches')
+    .select('id, team1, team2, match_time')
+    .eq('status', 'upcoming')
+    .order('match_time', { ascending: true })
 
   return (
     <div className="flex min-h-screen">
@@ -64,7 +70,7 @@ export default async function DashboardPage() {
           
           <div className="flex gap-4">
             <JoinLobbyModal />
-            <CreateLobbyModal />
+            <CreateLobbyModal matches={upcomingMatches || []} />
           </div>
         </div>
 
