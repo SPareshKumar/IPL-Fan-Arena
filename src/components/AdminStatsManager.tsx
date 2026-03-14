@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { getMatchRosterAndStats, updateManualScores } from '@/src/app/actions/admin'
 import { toast } from 'sonner'
 import { Database, Save } from 'lucide-react'
+import {updateMatchStatus } from '@/src/app/actions/admin'
 
 type Match = { id: number; team1: string; team2: string; match_time: string }
 type Player = { id: number; name: string; team: string; role: string }
@@ -60,6 +61,14 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
     
     setIsLoading(false)
   }
+  async function handleStatusChange(status: string) {
+    if (!selectedMatch) return
+    setIsLoading(true)
+    const result = await updateMatchStatus(Number(selectedMatch), status)
+    if (result.error) toast.error(result.error)
+    else toast.success(`Match status updated to: ${status.toUpperCase()}`)
+    setIsLoading(false)
+  }
 
   return (
     <div className="mt-10 bg-ipl-card border border-gray-800 rounded-2xl p-6">
@@ -113,6 +122,34 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
             <Save size={20} />
             OVERRIDE AND PUSH SCORES
           </button>
+          {/* --- MATCH LIFECYCLE CONTROLLER --- */}
+          <div className="mt-8 border-t border-gray-800 pt-6">
+            <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Match Lifecycle Control</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <button 
+                onClick={() => handleStatusChange('upcoming')}
+                className="bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
+              >
+                Set UPCOMING
+              </button>
+              <button 
+                onClick={() => handleStatusChange('live')}
+                className="bg-red-900/50 hover:bg-red-600 border border-red-700 text-white py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                Set LIVE
+              </button>
+              <button 
+                onClick={() => handleStatusChange('completed')}
+                className="bg-green-900/50 hover:bg-green-600 border border-green-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
+              >
+                Set COMPLETED
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Setting a match to LIVE or COMPLETED will lock all drafts for this lobby.
+            </p>
+          </div>
         </div>
       )}
 

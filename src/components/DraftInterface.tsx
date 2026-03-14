@@ -2,23 +2,22 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, Minus, Copyright } from 'lucide-react'
-import { lockTeam } from '@/src/app/actions/team' // <-- Import the action
-import { useRouter } from 'next/navigation' // <-- Import the router
+import { Plus, Minus } from 'lucide-react'
+import { lockTeam } from '@/src/app/actions/team' 
+import { useRouter } from 'next/navigation' 
 
-// Define the exact shape of our data so TypeScript can help us catch bugs
 type Player = { id: number; name: string; team: string; role: string }
 
 export default function DraftInterface({ 
   players, 
   lobbyType,
   lobbyId,
-  targetId // <-- Add this new prop
+  targetId 
 }: { 
   players: Player[]; 
   lobbyType: string;
   lobbyId: string;
-  targetId: number; // <-- Define its type
+  targetId: number; 
 }) {
   const [squad, setSquad] = useState<Player[]>([])
   const [captainId, setCaptainId] = useState<number | null>(null)
@@ -26,14 +25,19 @@ export default function DraftInterface({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
+  // --- DYNAMIC LOBBY RULES ---
+  // If it's a tournament, we use 11 players. Otherwise, it defaults to the 5-player single match rules.
+  const REQUIRED_SQUAD_SIZE = lobbyType === 'tournament' ? 11 : 5
+  const MAX_BAT = lobbyType === 'tournament' ? 4 : 2
+  const MAX_AR = lobbyType === 'tournament' ? 3 : 1
+  const MAX_BOWL = lobbyType === 'tournament' ? 4 : 2
+
   const handleLockTeam = async () => {
-    if (squad.length !== 5 || !captainId) return
+    if (squad.length !== REQUIRED_SQUAD_SIZE || !captainId) return
     setIsSubmitting(true)
     
-    // Extract just the numbers (IDs) from the player objects
     const playerIds = squad.map(p => p.id)
     
-    // Pass the targetId right in the middle!
     const result = await lockTeam(lobbyId, targetId, playerIds, captainId)
     
     if (result.error) {
@@ -41,40 +45,32 @@ export default function DraftInterface({
       setIsSubmitting(false)
     } else {
       toast.success('Team Locked Successfully!')
-      // Redirect them back to the dashboard after a successful draft
-      router.push('/dashboard') 
+      router.refresh() 
     }
   }
 
-  // Derived State: We calculate these on the fly based on the current squad
   const batsmen = squad.filter(p => p.role === 'BAT')
   const allRounders = squad.filter(p => p.role === 'AR')
   const bowlers = squad.filter(p => p.role === 'BOWL')
 
-  // The core game logic function
   const togglePlayer = (player: Player) => {
     const isSelected = squad.some(p => p.id === player.id)
 
     if (isSelected) {
-      // Remove player
       setSquad(squad.filter(p => p.id !== player.id))
-      if (captainId === player.id) setCaptainId(null) // Strip captaincy if removed
+      if (captainId === player.id) setCaptainId(null) 
       return
     }
 
-    // Apply exact rules based on your PRD for "Single Match"
-    if (lobbyType === 'single') {
-      if (squad.length >= 5) return toast.error('Squad full! You can only pick 5 players.')
-      if (player.role === 'BAT' && batsmen.length >= 2) return toast.error('Maximum 2 Batsmen allowed!')
-      if (player.role === 'AR' && allRounders.length >= 1) return toast.error('Maximum 1 All-Rounder allowed!')
-      if (player.role === 'BOWL' && bowlers.length >= 2) return toast.error('Maximum 2 Bowlers allowed!')
-    }
+    // Dynamic constraint checks based on the variables we set above
+    if (squad.length >= REQUIRED_SQUAD_SIZE) return toast.error(`Squad full! You can only pick ${REQUIRED_SQUAD_SIZE} players.`)
+    if (player.role === 'BAT' && batsmen.length >= MAX_BAT) return toast.error(`Maximum ${MAX_BAT} Batsmen allowed!`)
+    if (player.role === 'AR' && allRounders.length >= MAX_AR) return toast.error(`Maximum ${MAX_AR} All-Rounders allowed!`)
+    if (player.role === 'BOWL' && bowlers.length >= MAX_BOWL) return toast.error(`Maximum ${MAX_BOWL} Bowlers allowed!`)
 
-    // If all checks pass, add them to the team
     setSquad([...squad, player])
   }
 
-  // Visual helper component for the right-side pitch
   const PitchPlayer = ({ player }: { player: Player }) => (
     <div className="relative flex flex-col items-center group">
       <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-ipl-card shadow-lg">
@@ -84,7 +80,6 @@ export default function DraftInterface({
         {player.name}
       </div>
       
-      {/* Captaincy Selection Button */}
       <button 
         onClick={() => setCaptainId(captainId === player.id ? null : player.id)}
         className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-sm border transition-all ${
@@ -103,7 +98,17 @@ export default function DraftInterface({
       
       {/* LEFT SIDE: PLAYER POOL */}
       <div className="flex flex-col h-[calc(100vh-80px)] border-r border-gray-800 bg-ipl-bg p-6">
-        <h2 className="mb-4 text-xl font-bold text-white">Available Roster</h2>
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-white flex items-center justify-between">
+            Available Roster
+            <span className="bg-gray-800 text-ipl-gold px-3 py-1 rounded-full text-sm font-bold">
+              Drafted: {squad.length}/{REQUIRED_SQUAD_SIZE}
+            </span>
+          </h2>
+          <p className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-xs font-semibold text-yellow-500">
+            ⚠️ Once locked, your team cannot be changed. Squads must be locked before match start.
+          </p>
+        </div>
         
         <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
           {players.map((player) => {
@@ -140,29 +145,28 @@ export default function DraftInterface({
       {/* RIGHT SIDE: THE CRICKET PITCH */}
       <div className="relative flex flex-col h-[calc(100vh-80px)] border-l-8 border-ipl-bg bg-pitch-green p-6 shadow-2xl">
         
-        {/* CSS Pitch Markings */}
         <div className="pointer-events-none absolute inset-4 rounded-[100px] border border-white/20"></div>
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-32 -translate-x-1/2 -translate-y-1/2 border border-white/20 bg-[#e4d5b7]/5"></div>
 
-        {/* Dynamic Formation Layout */}
         <div className="relative z-10 flex h-full flex-col justify-between py-10">
           
           {/* Top Row: Batsmen */}
-          <div className="flex min-h-[100px] w-full items-center justify-center gap-12">
+          {/* Note: gap-12 changed to gap-4 sm:gap-8 so 4 players fit nicely! */}
+          <div className="flex min-h-[100px] w-full items-center justify-center gap-4 sm:gap-8">
             {batsmen.map(p => <PitchPlayer key={p.id} player={p} />)}
-            {batsmen.length === 0 && <span className="text-white/30 font-medium">Select Batsmen (Max 2)</span>}
+            {batsmen.length === 0 && <span className="text-white/30 font-medium">Select Batsmen (Max {MAX_BAT})</span>}
           </div>
 
           {/* Middle Row: All-Rounders */}
-          <div className="flex min-h-[100px] w-full items-center justify-center gap-12">
+          <div className="flex min-h-[100px] w-full items-center justify-center gap-4 sm:gap-8">
             {allRounders.map(p => <PitchPlayer key={p.id} player={p} />)}
-            {allRounders.length === 0 && <span className="text-white/30 font-medium">Select All-Rounder (Max 1)</span>}
+            {allRounders.length === 0 && <span className="text-white/30 font-medium">Select All-Rounder (Max {MAX_AR})</span>}
           </div>
 
           {/* Bottom Row: Bowlers */}
-          <div className="flex min-h-[100px] w-full items-center justify-center gap-12">
+          <div className="flex min-h-[100px] w-full items-center justify-center gap-4 sm:gap-8">
             {bowlers.map(p => <PitchPlayer key={p.id} player={p} />)}
-            {bowlers.length === 0 && <span className="text-white/30 font-medium">Select Bowlers (Max 2)</span>}
+            {bowlers.length === 0 && <span className="text-white/30 font-medium">Select Bowlers (Max {MAX_BOWL})</span>}
           </div>
 
         </div>
@@ -171,10 +175,10 @@ export default function DraftInterface({
         <div className="absolute bottom-6 left-1/2 z-20 w-full max-w-sm -translate-x-1/2 px-4">
           <button 
             onClick={handleLockTeam}
-            disabled={squad.length < 5 || !captainId || isSubmitting}
+            disabled={squad.length < REQUIRED_SQUAD_SIZE || !captainId || isSubmitting}
             className="w-full rounded-xl bg-ipl-gold py-4 font-black tracking-widest text-black shadow-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
           >
-            {isSubmitting ? 'LOCKING...' : squad.length < 5 ? `SELECT ${5 - squad.length} MORE PLAYERS` : !captainId ? 'CHOOSE A CAPTAIN' : 'LOCK TEAM'}
+            {isSubmitting ? 'LOCKING...' : squad.length < REQUIRED_SQUAD_SIZE ? `SELECT ${REQUIRED_SQUAD_SIZE - squad.length} MORE PLAYERS` : !captainId ? 'CHOOSE A CAPTAIN' : 'LOCK TEAM'}
           </button>
         </div>
       </div>

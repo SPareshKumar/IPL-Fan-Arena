@@ -91,3 +91,25 @@ export async function updateManualScores(matchId: number, playerScores: { player
   revalidatePath('/', 'layout') 
   return { success: true }
 }
+
+// --- FUNCTION 4: MATCH LIFECYCLE CONTROLLER ---
+export async function updateMatchStatus(matchId: number, newStatus: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  // 🔒 AUTHORIZATION GATE
+  const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
+  if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return { error: 'Unauthorized: Admin only.' }
+  }
+
+  const { error } = await supabase
+    .from('matches')
+    .update({ status: newStatus })
+    .eq('id', matchId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/', 'layout') 
+  return { success: true }
+}
