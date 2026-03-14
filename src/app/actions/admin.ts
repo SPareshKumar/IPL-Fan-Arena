@@ -36,4 +36,58 @@ export async function createMatch(formData: FormData) {
 
   revalidatePath('/admin')
   return { success: true }
+
+}
+
+// Fetch the players and any existing scores for a specific match
+export async function getMatchRosterAndStats(matchId: number) {
+  const supabase = await createClient()
+  
+  // 1. Get the match details to see who is playing
+  const { data: match } = await supabase.from('matches').select('team1, team2').eq('id', matchId).single()
+  if (!match) return { players: [], existingStats: [] }
+
+  // 2. Fetch only the players on those two teams
+  const { data: players } = await supabase
+    .from('players')
+    .select('*')
+    .in('team', [match.team1, match.team2])
+    .order('team')
+
+  // 3. Fetch any points they might already have
+  const { data: existingStats } = await supabase
+    .from('match_player_stats')
+    .select('player_id, fantasy_points')
+    .eq('match_id', matchId)
+
+  return { players: players || [], existingStats: existingStats || [] }
+}
+
+// Bulk save the typed-in scores
+export async function updateManualScores(matchId: number, playerScores: { playerId: number, points: number }[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  // 🔒 AUTHORIZATION GATE: Update this to your real email again!
+  const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
+  if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return { error: 'Unauthorized: Admin only.' }
+  }
+
+  // Format the data for our bulk upsert
+  const upsertData = playerScores.map(score => ({
+    match_id: matchId,
+    player_id: score.playerId,
+    fantasy_points: score.points
+  }))
+
+  const { error } = await supabase
+    .from('match_player_stats')
+    .upsert(upsertData, { onConflict: 'match_id, player_id' })
+
+  if (error) return { error: error.message }
+
+  // Refresh the entire site so Leaderboards instantly update
+  revalidatePath('/', 'layout') 
+  return { success: true }
 }
