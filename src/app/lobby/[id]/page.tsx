@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import DraftInterface from '@/src/components/DraftInterface'
 import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
+import LobbyModeration from '@/src/components/LobbyModeration'
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -38,6 +39,20 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
     .select('*')
     .in('team', [matchInfo.team1, matchInfo.team2])
     .order('team') 
+
+    // ... existing code where you fetch user and lobby ...
+
+  // 1. Check if the logged-in user is the creator of this lobby
+  const isCreator = user?.id === lobby?.created_by
+
+  // 2. Fetch all drafted teams for the Kick list 
+  // (Note: ensure 'teams' and 'user_name' match your actual Supabase table/columns!)
+  const { data: draftedTeams } = await supabase
+    .from('user_teams') 
+    .select('id, user_name, user_id')
+    .eq('lobby_id', id)
+
+  // ... rest of your existing logic ...
 
   return (
     <div className="flex min-h-screen flex-col bg-ipl-bg text-white">
@@ -75,7 +90,17 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           targetId={matchInfo.id} 
         />
       )}
-      
+      {/* ... Your existing Leaderboard or DraftInterface goes here ... */}
+
+      {/* --- CREATOR MODERATION ZONE --- */}
+      {isCreator && (
+        <div className="mt-12 w-full max-w-7xl mx-auto">
+          <LobbyModeration 
+            lobbyId={lobby.id} 
+            teams={draftedTeams || []} 
+          />
+        </div>
+      )}
     </div>
   )
 }
