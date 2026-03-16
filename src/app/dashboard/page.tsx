@@ -2,7 +2,7 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { History, Users, Info, Clock, ShieldAlert, Star } from 'lucide-react'
+import { History, Users, Info, Clock, ShieldAlert, Star, LogOut } from 'lucide-react' // <-- Added LogOut
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
 
@@ -13,8 +13,15 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // --- THE NEW LOGOUT ACTION ---
+  const handleLogout = async () => {
+    'use server'
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+    redirect('/') // Send them straight back to your beautiful new Landing Page!
+  }
+
   // 2. Fetch the user's active lobbies using an Inner Join!
-  // This tells Supabase: "Get all lobbies, but ONLY if the current user is inside the lobby_members table for that lobby."
   const { data: activeLobbies, error } = await supabase
     .from('lobbies')
     .select('*, lobby_members!inner(user_id)')
@@ -24,6 +31,7 @@ export default async function DashboardPage() {
   if (error) {
     console.error("Error fetching lobbies:", error)
   }
+  
   // Fetch upcoming matches for the Create Lobby modal
   const { data: upcomingMatches } = await supabase
     .from('matches')
@@ -58,6 +66,20 @@ export default async function DashboardPage() {
             Past Lobbies
           </button>
         </nav>
+
+        {/* --- THE NEW LOGOUT BUTTON --- */}
+        {/* mt-auto pushes this entire block to the absolute bottom of the sidebar */}
+        <div className="mt-auto border-t border-gray-800 pt-6">
+          <form action={handleLogout}>
+            <button 
+              type="submit" 
+              className="flex w-full items-center gap-3 rounded-lg p-3 text-sm font-medium text-gray-400 transition-colors hover:bg-red-900/20 hover:text-red-500"
+            >
+              <LogOut size={20} />
+              Log Out
+            </button>
+          </form>
+        </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
@@ -111,7 +133,7 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* RULES SECTION (Kept Exactly the Same) */}
+        {/* RULES SECTION */}
         <div className="rounded-2xl border border-gray-800 bg-ipl-card/50 p-8">
           <div className="mb-6 flex items-center gap-2 border-b border-gray-800 pb-4">
             <Info className="text-ipl-accent" size={24} />
