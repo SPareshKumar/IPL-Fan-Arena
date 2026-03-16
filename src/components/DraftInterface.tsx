@@ -80,12 +80,13 @@ export default function DraftInterface({
         {player.name}
       </div>
       
+      {/* THE FIX: Button is always visible on mobile (opacity-100) but hides on desktop (md:opacity-0) until hover */}
       <button 
         onClick={() => setCaptainId(captainId === player.id ? null : player.id)}
         className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-sm border transition-all ${
           captainId === player.id 
             ? 'bg-ipl-gold border-yellow-200 text-black scale-110 shadow-[0_0_10px_rgba(234,179,8,0.8)]' 
-            : 'bg-gray-800 border-gray-600 text-gray-400 opacity-0 group-hover:opacity-100'
+            : 'bg-gray-800 border-gray-600 text-gray-400 opacity-100 md:opacity-0 md:group-hover:opacity-100'
         }`}
       >
         <span className="text-[10px] font-black">C</span>
@@ -96,8 +97,8 @@ export default function DraftInterface({
   return (
     <main className="grid flex-1 grid-cols-1 lg:grid-cols-2">
       
-      {/* LEFT SIDE: PLAYER POOL */}
-      <div className="flex flex-col h-[calc(100vh-80px)] border-r border-gray-800 bg-ipl-bg p-6">
+      {/* LEFT SIDE: PLAYER POOL (Mobile: Order 2, Desktop: Order 1) */}
+      <div className="order-2 lg:order-1 flex flex-col h-[calc(100vh-80px)] border-r border-gray-800 bg-ipl-bg p-6">
         <div className="mb-4">
           <h2 className="text-xl font-bold text-white flex items-center justify-between">
             Available Roster
@@ -142,8 +143,8 @@ export default function DraftInterface({
         </div>
       </div>
 
-      {/* RIGHT SIDE: THE CRICKET PITCH */}
-      <div className="relative flex flex-col h-[calc(100vh-80px)] border-l-8 border-ipl-bg bg-pitch-green p-6 shadow-2xl">
+      {/* RIGHT SIDE: THE CRICKET PITCH (Mobile: Order 1, Desktop: Order 2) */}
+      <div className="order-1 lg:order-2 relative flex flex-col h-[calc(100vh-80px)] border-l-8 border-ipl-bg bg-pitch-green p-6 shadow-2xl">
         
         <div className="pointer-events-none absolute inset-4 rounded-[100px] border border-white/20"></div>
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-32 -translate-x-1/2 -translate-y-1/2 border border-white/20 bg-[#e4d5b7]/5"></div>
@@ -151,7 +152,6 @@ export default function DraftInterface({
         <div className="relative z-10 flex h-full flex-col justify-between py-10">
           
           {/* Top Row: Batsmen */}
-          {/* Note: gap-12 changed to gap-4 sm:gap-8 so 4 players fit nicely! */}
           <div className="flex min-h-[100px] w-full items-center justify-center gap-4 sm:gap-8">
             {batsmen.map(p => <PitchPlayer key={p.id} player={p} />)}
             {batsmen.length === 0 && <span className="text-white/30 font-medium">Select Batsmen (Max {MAX_BAT})</span>}

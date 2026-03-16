@@ -13,9 +13,10 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Added 'status' to the matches select query so we know if it's locked
   const { data: lobby, error } = await supabase
     .from('lobbies')
-    .select('*, lobby_members!inner(user_id), matches(id, team1, team2)')
+    .select('*, lobby_members!inner(user_id), matches(id, team1, team2, status)')
     .eq('id', id)
     .eq('lobby_members.user_id', user.id)
     .single()
@@ -25,34 +26,29 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   // @ts-ignore
   const matchInfo = lobby.matches
 
-  // --- NEW: Check if the user has ALREADY drafted a team ---
   const { data: existingTeam } = await supabase
     .from('user_teams')
     .select('id')
     .eq('lobby_id', lobby.id)
     .eq('user_id', user.id)
-    .maybeSingle() // maybeSingle() prevents an error from throwing if no team is found
+    .maybeSingle()
 
-  // Fetch players for the draft interface
   const { data: players } = await supabase
     .from('players')
     .select('*')
     .in('team', [matchInfo.team1, matchInfo.team2])
     .order('team') 
 
-    // ... existing code where you fetch user and lobby ...
-
-  // 1. Check if the logged-in user is the creator of this lobby
   const isCreator = user?.id === lobby?.created_by
 
-  // 2. Fetch all drafted teams for the Kick list 
-  // (Note: ensure 'teams' and 'user_name' match your actual Supabase table/columns!)
   const { data: draftedTeams } = await supabase
     .from('user_teams') 
     .select('id, user_name, user_id')
     .eq('lobby_id', id)
 
-  // ... rest of your existing logic ...
+  // --- SMART ROUTER LOGIC ---
+  const isMatchUpcoming = matchInfo.status === 'upcoming'
+  const shouldShowDraft = !existingTeam && isMatchUpcoming
 
   return (
     <div className="flex min-h-screen flex-col bg-ipl-bg text-white">
@@ -70,31 +66,37 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           </div>
         </div>
         
-        <div className="rounded-lg bg-gray-800 px-4 py-2 font-mono text-sm shadow-inner">
+        <div className="rounded-lg bg-gray-800 px-4 py-2 font-mono text-sm shadow-inner hidden sm:block">
           Code: <span className="text-ipl-accent">{lobby.invite_code}</span>
         </div>
       </header>
 
-      {/* THE SMART ROUTER: Render Leaderboard OR Draft Interface */}
-      {existingTeam ? (
-        <LobbyLeaderboard 
-          lobbyId={lobby.id} 
-          targetId={matchInfo.id} 
-          currentUserId={user.id} 
-        />
-      ) : (
+      {/* NEW: Spectator Warning for late players */}
+      {!existingTeam && !isMatchUpcoming && (
+        <div className="m-4 rounded-lg border border-red-900/50 bg-red-900/20 p-4 text-center text-red-400 font-bold max-w-7xl mx-auto w-full">
+          ⚠️ You missed the draft window! You are in spectator mode for this match.
+        </div>
+      )}
+
+      {/* THE SMART ROUTER: Render Draft Interface OR Leaderboard */}
+      {shouldShowDraft ? (
         <DraftInterface 
           players={players || []} 
           lobbyType={lobby.lobby_type} 
           lobbyId={lobby.id} 
           targetId={matchInfo.id} 
         />
+      ) : (
+        <LobbyLeaderboard 
+          lobbyId={lobby.id} 
+          targetId={matchInfo.id} 
+          currentUserId={user.id} 
+        />
       )}
-      {/* ... Your existing Leaderboard or DraftInterface goes here ... */}
 
       {/* --- CREATOR MODERATION ZONE --- */}
       {isCreator && (
-        <div className="mt-12 w-full max-w-7xl mx-auto">
+        <div className="mt-8 mb-12 w-full max-w-7xl mx-auto px-4">
           <LobbyModeration 
             lobbyId={lobby.id} 
             teams={draftedTeams || []} 
