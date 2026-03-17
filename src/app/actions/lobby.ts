@@ -12,9 +12,25 @@ export async function createLobby(formData: FormData) {
 
   const name = formData.get('name') as string
   const lobbyType = formData.get('type') as string
-  const targetId = formData.get('targetId') // <-- Grab the selected match ID
+  const targetId = formData.get('targetId')
 
   if (!name || name.length < 3) return { error: 'Name must be at least 3 characters.' }
+
+  // --- BACKEND FIX: The 15-Second Cooldown Anti-Spam Check ---
+  const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString()
+
+  const { data: recentLobby } = await supabase
+    .from('lobbies')
+    .select('id')
+    .eq('created_by', user.id)
+    .eq('name', name)
+    .gte('created_at', fifteenSecondsAgo)
+    .maybeSingle()
+
+  if (recentLobby) {
+    return { error: 'You just created a lobby with this exact name! Please wait a moment.' }
+  }
+  // -------------------------------------------------------------
 
   // 2. Generate a random 6-character alphanumeric code (e.g., "X7B9WQ")
   const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -25,7 +41,7 @@ export async function createLobby(formData: FormData) {
     .insert({
       name,
       lobby_type: lobbyType,
-      target_id: parseInt(targetId as string), // <-- Save it as a number
+      target_id: parseInt(targetId as string), 
       invite_code: inviteCode,
       created_by: user.id
     })
@@ -44,7 +60,7 @@ export async function createLobby(formData: FormData) {
 
   if (memberError) return { error: memberError.message }
 
-  // 5. Tell Next.js to refresh the dashboard page to show the new lobby!
+  // 5. Tell Next.js to refresh the dashboard page to show the new lobby
   revalidatePath('/dashboard')
 
   return { success: true, inviteCode }
@@ -66,17 +82,18 @@ export async function joinLobby(formData: FormData) {
     .from('lobbies')
     .select('id, name')
     .eq('invite_code', inviteCode)
-    .single()
+    .maybeSingle()
 
   if (lobbyError || !lobby) return { error: 'Invalid invite code. Lobby not found.' }
 
   // 2. Check if the user is ALREADY in this lobby to prevent duplicate errors
+  // THE FIX: changed .single() to .maybeSingle() to prevent database errors when checking
   const { data: existingMember } = await supabase
     .from('lobby_members')
     .select('user_id')
     .eq('lobby_id', lobby.id)
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (existingMember) return { error: 'You are already a member of this lobby!' }
 

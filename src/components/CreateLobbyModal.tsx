@@ -11,14 +11,15 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // This handles the form submission
   async function handleSubmit(formData: FormData) {
+    // FRONTEND FIX: The immediate lock. If it's already loading, ignore extra clicks completely.
+    if (isLoading) return 
+    
     setIsLoading(true)
     
-    // Call our Server Action directly!
     const result = await createLobby(formData)
     
-    if (result.error) {
+    if (result?.error) {
       toast.error(result.error)
     } else {
       toast.success(`Lobby created! Invite code: ${result.inviteCode}`)
@@ -30,7 +31,6 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
 
   return (
     <>
-      {/* The Trigger Button */}
       <button 
         onClick={() => setIsOpen(true)}
         className="flex items-center gap-2 rounded-lg bg-ipl-gold px-5 py-3 text-sm font-bold text-black transition-all hover:bg-ipl-gold-hover hover:scale-105 shadow-[0_0_15px_rgba(234,179,8,0.2)]"
@@ -39,7 +39,6 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
         Create Lobby
       </button>
 
-      {/* The Modal Overlay */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-ipl-bg p-6 shadow-2xl">
@@ -92,7 +91,11 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full rounded-lg bg-ipl-gold p-3 font-bold text-black transition-colors hover:bg-ipl-gold-hover disabled:opacity-50 mt-4"
+                className={`w-full rounded-lg p-3 font-bold transition-all mt-4 ${
+                  isLoading 
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                    : 'bg-ipl-gold text-black hover:bg-yellow-400'
+                }`}
               >
                 {isLoading ? 'Creating...' : 'Create & Generate Code'}
               </button>
