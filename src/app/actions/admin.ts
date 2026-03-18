@@ -2,6 +2,7 @@
 
 import { createClient } from '@/src/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 export async function createMatch(formData: FormData) {
   const supabase = await createClient()
@@ -92,23 +93,39 @@ export async function updateManualScores(matchId: number, playerScores: { player
   return { success: true }
 }
 
+
+
 // --- FUNCTION 4: MATCH LIFECYCLE CONTROLLER ---
 export async function updateMatchStatus(matchId: number, newStatus: string) {
-  const supabase = await createClient()
+  const supabase = await createClient() // Normal client for auth check
   const { data: { user } } = await supabase.auth.getUser()
   
-  // 🔒 AUTHORIZATION GATE
   const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
   if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return { error: 'Unauthorized: Admin only.' }
   }
 
-  const { error } = await supabase
+  // 🔥 CREATE THE ADMIN "GOD MODE" CLIENT TO BYPASS RLS 🔥
+  const adminSupabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // 1. Update the match
+  const { error: matchError } = await adminSupabase
     .from('matches')
     .update({ status: newStatus })
     .eq('id', matchId)
 
-  if (error) return { error: error.message }
+  if (matchError) return { error: matchError.message }
+
+  // 2. Update the lobbies (This will now FORCE the update!)
+  const { error: lobbyError } = await adminSupabase
+    .from('lobbies')
+    .update({ status: newStatus })
+    .eq('target_id', matchId)
+
+  if (lobbyError) return { error: lobbyError.message }
 
   revalidatePath('/', 'layout') 
   return { success: true }
