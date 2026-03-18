@@ -172,10 +172,12 @@ export default function DraftInterface({
         {/* LIST OF PLAYERS */}
         <div 
           key={`${activeRole}-${activeTeam}`} 
-          className="flex-1 overflow-y-auto pr-2 pb-6 space-y-3 custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300"
+          // THE FIX: Changed from flex column (space-y-3) to a responsive Grid!
+          className="flex-1 overflow-y-auto pr-2 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300"
         >
           {filteredPlayers.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center text-gray-500">
+            // Added col-span-full here so the empty state takes up the whole width
+            <div className="col-span-full flex h-40 flex-col items-center justify-center text-gray-500">
               <UserCircle size={40} className="mb-2 opacity-20" />
               <p className="text-sm font-medium">No players found in this category.</p>
             </div>
