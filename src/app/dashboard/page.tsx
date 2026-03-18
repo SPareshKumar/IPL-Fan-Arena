@@ -2,7 +2,7 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { History, Users, Info, Clock, ShieldAlert, Star, LogOut } from 'lucide-react'
+import { History, Users, Info, Clock, ShieldAlert, Star } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
 
@@ -55,16 +55,17 @@ export default async function DashboardPage() {
             <h1 className="text-lg md:text-xl font-bold tracking-wider text-ipl-gold">IPL ARENA</h1>
           </div>
 
-          {/* Mobile-Only Logout Button */}
+          {/* Mobile-Only User Avatar (Replaces Logout) */}
           <div className="md:hidden">
-            <form action={handleLogout}>
-              <button 
-                type="submit" 
-                className="flex items-center justify-center rounded-lg bg-gray-800/50 p-2 text-gray-400 transition-colors hover:bg-red-900/30 hover:text-red-500"
-              >
-                <LogOut size={20} />
-              </button>
-            </form>
+            <Link href="/profile">
+              <div className="h-9 w-9 overflow-hidden rounded-full border-2 border-gray-700 transition-all hover:border-ipl-gold">
+                {user.user_metadata?.avatar_url ? (
+                  <Image src={user.user_metadata.avatar_url} alt="Profile" width={36} height={36} className="object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400"><Users size={16} /></div>
+                )}
+              </div>
+            </Link>
           </div>
         </div>
         
@@ -80,17 +81,23 @@ export default async function DashboardPage() {
           </button>
         </nav>
 
-        {/* Desktop-Only Logout Button */}
+        {/* Desktop-Only User Avatar Profile Link (Replaces Logout) */}
         <div className="hidden md:block mt-auto border-t border-gray-800 pt-6">
-          <form action={handleLogout}>
-            <button 
-              type="submit" 
-              className="flex w-full items-center gap-3 rounded-lg p-3 text-sm font-medium text-gray-400 transition-colors hover:bg-red-900/20 hover:text-red-500"
-            >
-              <LogOut size={20} />
-              Log Out
-            </button>
-          </form>
+          <Link href="/profile" className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-800/50 group">
+            <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-gray-700 transition-all group-hover:border-ipl-gold shadow-md">
+              {user.user_metadata?.avatar_url ? (
+                <Image src={user.user_metadata.avatar_url} alt="Profile" width={40} height={40} className="object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400"><Users size={20} /></div>
+              )}
+            </div>
+            <div className="overflow-hidden">
+              <p className="truncate text-sm font-bold text-white transition-colors group-hover:text-ipl-gold">
+                {user.user_metadata?.full_name || 'My Profile'}
+              </p>
+              <p className="text-xs text-gray-400">Profile</p>
+            </div>
+          </Link>
         </div>
       </aside>
 
