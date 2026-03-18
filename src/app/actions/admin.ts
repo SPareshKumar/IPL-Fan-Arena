@@ -95,9 +95,9 @@ export async function updateManualScores(matchId: number, playerScores: { player
 
 
 
-// --- FUNCTION 4: MATCH LIFECYCLE CONTROLLER ---
+// --- FUNCTION 4: MATCH LIFECYCLE CONTROLLER & POINTS AGGREGATOR ---
 export async function updateMatchStatus(matchId: number, newStatus: string) {
-  const supabase = await createClient() // Normal client for auth check
+  const supabase = await createClient() 
   const { data: { user } } = await supabase.auth.getUser()
   
   const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
@@ -105,13 +105,13 @@ export async function updateMatchStatus(matchId: number, newStatus: string) {
     return { error: 'Unauthorized: Admin only.' }
   }
 
-  // 🔥 CREATE THE ADMIN "GOD MODE" CLIENT TO BYPASS RLS 🔥
+  // 🔥 GOD MODE CLIENT
   const adminSupabase = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // 1. Update the match
+  // 1. Update the match status
   const { error: matchError } = await adminSupabase
     .from('matches')
     .update({ status: newStatus })
@@ -119,13 +119,71 @@ export async function updateMatchStatus(matchId: number, newStatus: string) {
 
   if (matchError) return { error: matchError.message }
 
-  // 2. Update the lobbies (This will now FORCE the update!)
+  // 2. Cascade status to lobbies
   const { error: lobbyError } = await adminSupabase
     .from('lobbies')
     .update({ status: newStatus })
     .eq('target_id', matchId)
 
   if (lobbyError) return { error: lobbyError.message }
+
+  // ====================================================================
+  // 3. THE MAGIC: AUTOMATIC POINTS CALCULATION (Only if completed)
+  // ====================================================================
+  if (newStatus === 'completed') {
+    // A. Get all player scores for this match
+    const { data: playerStats } = await adminSupabase
+      .from('match_player_stats')
+      .select('player_id, fantasy_points')
+      .eq('match_id', matchId)
+
+    // Create a fast lookup dictionary: { playerId: points }
+    const pointsMap: Record<number, number> = {}
+    playerStats?.forEach(stat => {
+      pointsMap[stat.player_id] = stat.fantasy_points || 0
+    })
+
+    // B. Get every user's locked team for this match
+    const { data: teams } = await adminSupabase
+      .from('user_teams')
+      .select('id, user_id, lobby_id, players, captain_id')
+      .eq('target_id', matchId)
+
+    if (teams && teams.length > 0) {
+      // C. Loop through each team and calculate the math
+      for (const team of teams) {
+        let totalTeamPoints = 0
+        
+        // Ensure players array is readable (JSONB format in Supabase)
+        const draftedPlayers: number[] = Array.isArray(team.players) 
+          ? team.players 
+          : JSON.parse(team.players as unknown as string || '[]')
+
+        draftedPlayers.forEach(playerId => {
+          let pts = pointsMap[playerId] || 0
+          
+          // Captain gets 2x points!
+          if (playerId === team.captain_id) {
+            pts *= 2
+          }
+          totalTeamPoints += pts
+        })
+
+        // D. Save the final score to the user_teams table
+        await adminSupabase
+          .from('user_teams')
+          .update({ points_earned: totalTeamPoints })
+          .eq('id', team.id)
+
+        // E. Save the final score to the lobby_members table (For the Profile Page!)
+        await adminSupabase
+          .from('lobby_members')
+          .update({ total_points: totalTeamPoints })
+          .eq('lobby_id', team.lobby_id)
+          .eq('user_id', team.user_id)
+      }
+    }
+  }
 
   revalidatePath('/', 'layout') 
   return { success: true }
