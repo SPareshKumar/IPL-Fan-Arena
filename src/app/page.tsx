@@ -2,6 +2,7 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+
 import { History, Users, Info, Clock, ShieldAlert, Star, LogIn } from 'lucide-react'
 
 export default async function LandingPage() {

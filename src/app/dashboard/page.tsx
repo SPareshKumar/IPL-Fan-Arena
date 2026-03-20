@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { History, Users, Info, Clock, ShieldAlert, Star } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
+import CopyInviteCode from '@/src/components/CopyInviteCode'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -160,9 +161,7 @@ export default async function DashboardPage() {
                           </span>
                         </div>
 
-                        <div className="text-xs md:text-sm text-gray-400">
-                          Code: <span className="font-mono tracking-widest text-ipl-gold">{lobby.invite_code}</span>
-                        </div>
+                        <CopyInviteCode code={lobby.invite_code} />
                       </div>
                     </div>
                     
