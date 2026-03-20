@@ -1,7 +1,7 @@
 import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, LogOut } from 'lucide-react'
 import DraftInterface from '@/src/components/DraftInterface'
 import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 import LobbyModeration from '@/src/components/LobbyModeration'
@@ -13,7 +13,6 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Added 'status' to the matches select query so we know if it's locked
   const { data: lobby, error } = await supabase
     .from('lobbies')
     .select('*, lobby_members!inner(user_id), matches(id, team1, team2, status)')
@@ -41,10 +40,46 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
 
   const isCreator = user?.id === lobby?.created_by
 
-  const { data: draftedTeams } = await supabase
-    .from('user_teams') 
-    .select('id, user_name, user_id')
+  // ====================================================================
+  // THE FIX: Bulletproof way to get participants & their names
+  // ====================================================================
+  const { data: lobbyMembers } = await supabase
+    .from('lobby_members')
+    .select('user_id')
     .eq('lobby_id', id)
+    .neq('user_id', lobby.created_by) // Hide the creator from the kick list!
+
+  let participants: { user_id: string, user_name: string }[] = []
+  
+  if (lobbyMembers && lobbyMembers.length > 0) {
+    const userIds = lobbyMembers.map(m => m.user_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, email')
+      .in('id', userIds)
+
+    participants = lobbyMembers.map(m => {
+      const profile = profiles?.find(p => p.id === m.user_id)
+      return {
+        user_id: m.user_id,
+        user_name: profile?.display_name || profile?.email?.split('@')[0] || 'Unknown Player'
+      }
+    })
+  }
+  // ====================================================================
+
+  // --- LEAVE LOBBY SERVER ACTION ---
+  async function handleLeaveLobby() {
+    'use server'
+    const supabaseAction = await createClient()
+    
+    // 1. Delete their team if they drafted one
+    await supabaseAction.from('user_teams').delete().eq('lobby_id', id).eq('user_id', user!.id)
+    // 2. Remove them from the lobby
+    await supabaseAction.from('lobby_members').delete().eq('lobby_id', id).eq('user_id', user!.id)
+    
+    redirect('/dashboard')
+  }
 
   // --- SMART ROUTER LOGIC ---
   const isMatchUpcoming = matchInfo.status === 'upcoming'
@@ -71,7 +106,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         </div>
       </header>
 
-      {/* NEW: Spectator Warning for late players */}
+      {/* Spectator Warning for late players */}
       {!existingTeam && !isMatchUpcoming && (
         <div className="m-4 rounded-lg border border-red-900/50 bg-red-900/20 p-4 text-center text-red-400 font-bold max-w-7xl mx-auto w-full">
           ⚠️ You missed the draft window! You are in spectator mode for this match.
@@ -99,8 +134,23 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         <div className="mt-8 mb-12 w-full max-w-7xl mx-auto px-4">
           <LobbyModeration 
             lobbyId={lobby.id} 
-            teams={draftedTeams || []} 
+            teams={participants} // <-- Now passing the clean data!
           />
+        </div>
+      )}
+
+      {/* --- NORMAL USER LEAVE LOBBY BUTTON --- */}
+      {!isCreator && (
+        <div className="mt-8 mb-12 w-full max-w-7xl mx-auto px-4 flex justify-center md:justify-start">
+          <form action={handleLeaveLobby}>
+            <button 
+              type="submit" 
+              className="flex items-center gap-2 rounded-xl border border-red-900/50 bg-red-900/20 px-6 py-3 font-bold text-red-500 transition-all hover:bg-red-900/40 hover:text-red-400"
+            >
+              <LogOut size={18} />
+              LEAVE LOBBY
+            </button>
+          </form>
         </div>
       )}
     </div>

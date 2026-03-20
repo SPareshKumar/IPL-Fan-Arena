@@ -10,10 +10,10 @@ export default function LobbyModeration({
   teams 
 }: { 
   lobbyId: string;
-  teams: { id: number; user_name: string }[] 
+  teams: { user_id: string; user_name: string }[] // <-- FIXED: Now expects user_id
 }) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const [kickingId, setKickingId] = useState<number | null>(null)
+  const [kickingId, setKickingId] = useState<string | null>(null) // <-- FIXED: String for UUID
 
   async function handleDeleteLobby() {
     const confirmDelete = window.confirm("Are you sure? This will permanently delete the lobby and all drafted teams.")
@@ -27,19 +27,26 @@ export default function LobbyModeration({
       setIsDeleting(false)
     } else {
       // THE NUCLEAR CACHE BUSTER
-      // This forces the browser to do a hard refresh, completely bypassing the Next.js cache!
       window.location.replace('/dashboard')
     }
   }
-  async function handleKickPlayer(teamId: number, userName: string) {
+
+  // <-- FIXED: Accepts userId (string) instead of teamId (number)
+  async function handleKickPlayer(userId: string, userName: string) {
     const confirmKick = window.confirm(`Are you sure you want to kick ${userName}?`)
     if (!confirmKick) return
 
-    setKickingId(teamId)
-    const result = await kickPlayer(lobbyId, teamId)
+    setKickingId(userId)
+    // Note: Make sure your server action expects a string (userId) here now!
+    const result = await kickPlayer(lobbyId, userId) 
     
-    if (result?.error) toast.error(result.error)
-    else toast.success(`${userName} has been kicked.`)
+    if (result?.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(`${userName} has been kicked.`)
+      // Optional: Refresh the page so the kicked user immediately disappears from the list
+      window.location.reload() 
+    }
     
     setKickingId(null)
   }
@@ -58,7 +65,7 @@ export default function LobbyModeration({
           <button 
             onClick={handleDeleteLobby}
             disabled={isDeleting}
-            className="flex items-center gap-2 bg-red-900/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+            className="flex items-center gap-2 bg-red-900/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
           >
             <Trash2 size={16} /> {isDeleting ? 'DELETING...' : 'DELETE LOBBY'}
           </button>
@@ -72,12 +79,14 @@ export default function LobbyModeration({
           ) : (
             <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
               {teams.map(team => (
-                <div key={team.id} className="flex items-center justify-between bg-gray-900/50 p-2 rounded border border-gray-800">
+                // <-- FIXED: key uses team.user_id
+                <div key={team.user_id} className="flex items-center justify-between bg-gray-900/50 p-2 rounded border border-gray-800">
                   <span className="text-sm font-medium text-gray-300">{team.user_name}</span>
                   <button 
-                    onClick={() => handleKickPlayer(team.id, team.user_name)}
-                    disabled={kickingId === team.id}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1.5 rounded transition-colors"
+                    // <-- FIXED: Passes team.user_id
+                    onClick={() => handleKickPlayer(team.user_id, team.user_name)}
+                    disabled={kickingId === team.user_id}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1.5 rounded transition-colors disabled:opacity-50"
                   >
                     <UserX size={14} />
                   </button>
