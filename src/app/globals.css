@@ -14,3 +14,22 @@ body {
   background-color: var(--color-ipl-bg);
   color: white;
 }
+
+/* Custom Scrollbar for IPL Arena */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;  /* Very thin vertical scrollbar */
+  height: 0px; /* Hide horizontal scrollbar completely */
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; /* Blends in with your dark theme */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #eab308; /* ipl-gold */
+  border-radius: 10px; /* Smooth rounded edges */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #ca8a04; /* Darker gold when hovered */
+}

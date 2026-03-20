@@ -2,10 +2,10 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { History, Users, Info, Clock, ShieldAlert, Star } from 'lucide-react'
+import { Users, Info, Clock, ShieldAlert, Star, Calendar } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
-import CopyInviteCode from '@/src/components/CopyInviteCode'
+import LobbyGrid from '@/src/components/LobbyGrid' // Uses your new interactive grid!
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -13,14 +13,6 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const handleLogout = async () => {
-    'use server'
-    const supabase = await createClient()
-    await supabase.auth.signOut()
-    redirect('/') 
-  }
-
-  // FIX 1: Added 'matches(team1, team2, status)' to the query so we get the match info for each lobby!
   const { data: activeLobbies, error } = await supabase
     .from('lobbies')
     .select('*, lobby_members!inner(user_id), matches(team1, team2, status)')
@@ -29,20 +21,21 @@ export default async function DashboardPage() {
 
   if (error) console.error("Error fetching lobbies:", error)
   
-  const { data: upcomingMatches } = await supabase
+  const { data: scheduleMatches } = await supabase
     .from('matches')
-    .select('id, team1, team2, match_time')
-    .eq('status', 'upcoming')
+    .select('id, team1, team2, match_time, status')
+    .in('status', ['upcoming', 'live'])
     .order('match_time', { ascending: true })
+    
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
       
-      {/* LEFT SIDEBAR (Turns into a Top/Nav Bar on Mobile) */}
-      <aside className="flex w-full md:w-64 flex-col border-b md:border-b-0 md:border-r border-gray-800 bg-ipl-bg p-4 md:p-6">
+      {/* LEFT SIDEBAR - Locked to screen height */}
+      <aside className="flex w-full md:w-64 flex-col border-b md:border-b-0 md:border-r border-gray-800 bg-ipl-bg p-4 md:p-6 md:sticky md:top-0 md:h-screen">
         
         {/* Header Section */}
-        <div className="flex items-center justify-between md:mb-10">
+        <div className="flex items-center justify-between md:mb-8 shrink-0">
           <div className="flex items-center gap-3">
             <div className="overflow-hidden rounded-full border-2 border-ipl-gold shadow-[0_0_10px_rgba(234,179,8,0.3)]">
               <Image 
@@ -56,7 +49,6 @@ export default async function DashboardPage() {
             <h1 className="text-lg md:text-xl font-bold tracking-wider text-ipl-gold">IPL ARENA</h1>
           </div>
 
-          {/* Mobile-Only User Avatar (Replaces Logout) */}
           <div className="md:hidden">
             <Link href="/profile">
               <div className="h-9 w-9 overflow-hidden rounded-full border-2 border-gray-700 transition-all hover:border-ipl-gold">
@@ -71,21 +63,60 @@ export default async function DashboardPage() {
         </div>
         
         {/* Navigation Links */}
-        <nav className="mt-4 flex gap-3 overflow-x-auto pb-2 md:mt-0 md:flex-1 md:flex-col md:space-y-3 md:overflow-visible md:pb-0 custom-scrollbar">
+        <nav className="mt-4 flex gap-3 overflow-x-auto pb-2 md:mt-0 md:flex-col md:space-y-3 md:overflow-visible md:pb-0 shrink-0 custom-scrollbar">
           <button className="flex min-w-[150px] md:w-full items-center gap-3 rounded-lg border border-gray-800 bg-ipl-card p-3 text-sm font-medium text-white transition-colors hover:bg-gray-800">
             <Users size={20} className="text-ipl-accent" />
             Active Lobbies
           </button>
-          <button className="flex min-w-[150px] md:w-full items-center gap-3 rounded-lg p-3 text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-white">
-            <History size={20} />
-            Past Lobbies
-          </button>
         </nav>
 
-        {/* Desktop-Only User Avatar Profile Link (Replaces Logout) */}
-        <div className="hidden md:block mt-auto border-t border-gray-800 pt-6">
-          <Link href="/profile" className="flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-gray-800/50 group">
-            <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-gray-700 transition-all group-hover:border-ipl-gold shadow-md">
+        {/* --- MATCH SCHEDULE WIDGET --- */}
+        {/* THE FIX: Added flex-1, min-h-0, overflow-x-hidden to perfectly contain the scroll! */}
+        <div className="mt-4 md:mt-8 flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar md:pr-3">
+          <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 shrink-0">
+            <Calendar size={14} /> Match Center
+          </div>
+          
+          <div className="flex gap-3 overflow-x-auto md:overflow-x-hidden pb-2 md:flex-col md:space-y-3 md:pb-0 custom-scrollbar">
+            {scheduleMatches?.length === 0 ? (
+              <p className="text-xs text-gray-500 italic">No matches scheduled.</p>
+            ) : (
+              scheduleMatches?.map(match => {
+                const isLive = match.status === 'live'
+                const matchDate = new Date(match.match_time)
+                const dateStr = matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                const timeStr = matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
+                return (
+                  // THE FIX: md:min-w-0 prevents it from stretching horizontally!
+                  <div key={match.id} className="min-w-[200px] md:min-w-0 md:w-full shrink-0 rounded-lg border border-gray-800 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-200">
+                        {match.team1} <span className="text-gray-600 font-normal mx-1">vs</span> {match.team2}
+                      </span>
+                      {isLive ? (
+                        <span className="flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-black text-red-500">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500"></span> LIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-gray-500 uppercase">Upcoming</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] font-medium text-gray-400">
+                      {isLive ? 'Action in progress!' : `${dateStr} • ${timeStr}`}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Desktop-Only User Avatar */}
+        {/* THE FIX: shrink-0 and extra padding keeps it safe from overlapping! */}
+        <div className="hidden md:block mt-auto shrink-0 border-t border-gray-800 pt-5 pb-2 bg-ipl-bg">
+          <Link href="/profile" className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-800/50 group">
+            <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-gray-700 transition-all group-hover:border-ipl-gold shadow-md shrink-0">
               {user.user_metadata?.avatar_url ? (
                 <Image src={user.user_metadata.avatar_url} alt="Profile" width={40} height={40} className="object-cover" />
               ) : (
@@ -96,7 +127,7 @@ export default async function DashboardPage() {
               <p className="truncate text-sm font-bold text-white transition-colors group-hover:text-ipl-gold">
                 {user.user_metadata?.full_name || 'My Profile'}
               </p>
-              <p className="text-xs text-gray-400">Profile</p>
+              <p className="text-xs text-gray-400">View Stats & History</p>
             </div>
           </Link>
         </div>
@@ -113,67 +144,12 @@ export default async function DashboardPage() {
           
           <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
             <div className="flex-1 sm:flex-none"><JoinLobbyModal /></div>
-            <div className="flex-1 sm:flex-none"><CreateLobbyModal matches={upcomingMatches || []} /></div>
+            <div className="flex-1 sm:flex-none"><CreateLobbyModal matches={scheduleMatches?.filter(m => m.status === 'upcoming') || []} /></div>
           </div>
         </div>
 
-        {/* DYNAMIC LOBBY GRID */}
-        <div className="mb-12 md:mb-16 grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {activeLobbies?.length === 0 ? (
-            <div className="col-span-full rounded-xl border border-dashed border-gray-700 p-6 md:p-10 text-center text-gray-400">
-              <p>You aren't in any active lobbies right now.</p>
-              <p className="mt-2 text-xs md:text-sm">Create a new one or use a friend's invite code to join!</p>
-            </div>
-          ) : (
-            activeLobbies?.map((lobby) => {
-              // Extract the match data safely
-              const match = (lobby as any).matches;
-              
-              return (
-                <Link href={`/lobby/${lobby.id}`} key={lobby.id}>
-                  <div className="flex h-full cursor-pointer flex-col justify-between rounded-xl border border-gray-800 bg-ipl-card p-5 md:p-6 transition-all hover:border-gray-500 hover:shadow-lg">
-                    <div>
-                      <div className="mb-4 flex items-start justify-between">
-                        <h3 className="truncate pr-2 text-lg md:text-xl font-bold">{lobby.name}</h3>
-                        <span className="whitespace-nowrap rounded-full bg-blue-500/10 px-2 md:px-3 py-1 text-[10px] md:text-xs font-semibold text-ipl-accent capitalize">
-                          {lobby.lobby_type === 'single' ? 'Single' : 'Tournament'}
-                        </span>
-                      </div>
-                      
-                      <div className="mb-4 md:mb-6 space-y-2">
-                        {/* THE NEW MATCH STATUS UI */}
-                        {match && (
-                          <div className="text-xs md:text-sm font-semibold text-gray-300">
-                            {match.team1} vs {match.team2}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
-                          Match:
-                          <span className={`capitalize font-bold flex items-center gap-1 ${
-                            match?.status === 'live' ? 'text-red-500' : 
-                            match?.status === 'completed' ? 'text-green-500' : 
-                            'text-blue-400'
-                          }`}>
-                            {/* Add a pulsing dot if the match is live! */}
-                            {match?.status === 'live' && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
-                            {match?.status || 'Unknown'}
-                          </span>
-                        </div>
-
-                        <CopyInviteCode code={lobby.invite_code} />
-                      </div>
-                    </div>
-                    
-                    <div className="mt-auto flex items-center justify-end border-t border-gray-800/50 pt-3 md:pt-4 text-xs md:text-sm">
-                      <span className="font-semibold text-ipl-gold transition-colors hover:text-white">Enter Match &rarr;</span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })
-          )}
-        </div>
+        {/* DYNAMIC INTERACTIVE LOBBY GRID */}
+        <LobbyGrid lobbies={activeLobbies || []} />
 
         {/* RULES SECTION */}
         <div className="rounded-xl md:rounded-2xl border border-gray-800 bg-ipl-card/50 p-5 md:p-8">
