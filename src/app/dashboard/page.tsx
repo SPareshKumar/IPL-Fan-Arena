@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Users, Info, Clock, ShieldAlert, Star, Calendar } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
-import LobbyGrid from '@/src/components/LobbyGrid' // Uses your new interactive grid!
+import LobbyGrid from '@/src/components/LobbyGrid'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -21,12 +21,12 @@ export default async function DashboardPage() {
 
   if (error) console.error("Error fetching lobbies:", error)
   
+  // FETCH ALL MATCHES: Removed .limit(5) so the user can scroll the whole season
   const { data: scheduleMatches } = await supabase
     .from('matches')
     .select('id, team1, team2, match_time, status')
     .in('status', ['upcoming', 'live'])
     .order('match_time', { ascending: true })
-    
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
       <aside className="flex w-full md:w-64 flex-col border-b md:border-b-0 md:border-r border-gray-800 bg-ipl-bg p-4 md:p-6 md:sticky md:top-0 md:h-screen">
         
         {/* Header Section */}
-        <div className="flex items-center justify-between md:mb-8 shrink-0">
+        <div className="flex items-center justify-between md:mb-5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="overflow-hidden rounded-full border-2 border-ipl-gold shadow-[0_0_10px_rgba(234,179,8,0.3)]">
               <Image 
@@ -62,17 +62,11 @@ export default async function DashboardPage() {
           </div>
         </div>
         
-        {/* Navigation Links */}
-        <nav className="mt-4 flex gap-3 overflow-x-auto pb-2 md:mt-0 md:flex-col md:space-y-3 md:overflow-visible md:pb-0 shrink-0 custom-scrollbar">
-          <button className="flex min-w-[150px] md:w-full items-center gap-3 rounded-lg border border-gray-800 bg-ipl-card p-3 text-sm font-medium text-white transition-colors hover:bg-gray-800">
-            <Users size={20} className="text-ipl-accent" />
-            Active Lobbies
-          </button>
-        </nav>
+        {/* Sleek Fading Gradient Divider */}
+        <div className="hidden md:block h-px w-full bg-gradient-to-r from-gray-700/50 via-gray-700/50 to-transparent shrink-0 mb-5"></div>
 
         {/* --- MATCH SCHEDULE WIDGET --- */}
-        {/* THE FIX: Added flex-1, min-h-0, overflow-x-hidden to perfectly contain the scroll! */}
-        <div className="mt-4 md:mt-8 flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar md:pr-3">
+        <div className="mt-4 md:mt-0 flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar md:pr-3">
           <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 shrink-0">
             <Calendar size={14} /> Match Center
           </div>
@@ -88,7 +82,6 @@ export default async function DashboardPage() {
                 const timeStr = matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 
                 return (
-                  // THE FIX: md:min-w-0 prevents it from stretching horizontally!
                   <div key={match.id} className="min-w-[200px] md:min-w-0 md:w-full shrink-0 rounded-lg border border-gray-800 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-200">
@@ -113,7 +106,6 @@ export default async function DashboardPage() {
         </div>
 
         {/* Desktop-Only User Avatar */}
-        {/* THE FIX: shrink-0 and extra padding keeps it safe from overlapping! */}
         <div className="hidden md:block mt-auto shrink-0 border-t border-gray-800 pt-5 pb-2 bg-ipl-bg">
           <Link href="/profile" className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-800/50 group">
             <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-gray-700 transition-all group-hover:border-ipl-gold shadow-md shrink-0">
