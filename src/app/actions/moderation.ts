@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/src/lib/supabase/server'
+import { revalidatePath } from 'next/dist/server/web/spec-extension/revalidate'
 
 export async function deleteLobby(lobbyId: string) {
   const supabase = await createClient()
@@ -18,15 +19,40 @@ export async function deleteLobby(lobbyId: string) {
   return { success: true }
 }
 
-export async function kickPlayer(lobbyId: string, targetTeamId: number) {
+export async function kickPlayer(lobbyId: string, targetUserId: string) {
   const supabase = await createClient()
-  
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Unauthorized' }
+
+  // 1. Verify the person requesting the kick is actually the lobby creator
+  const { data: lobby } = await supabase
+    .from('lobbies')
+    .select('created_by')
+    .eq('id', lobbyId)
+    .single()
+
+  if (lobby?.created_by !== user.id) {
+    return { error: 'Only the lobby host can kick players.' }
+  }
+
+  // 2. Delete the player's drafted team (if they already made one)
+  await supabase
     .from('user_teams')
     .delete()
-    .eq('id', targetTeamId)
     .eq('lobby_id', lobbyId)
+    .eq('user_id', targetUserId)
 
-  if (error) return { error: error.message }
+  // 3. Remove the player from the lobby completely
+  const { error: kickError } = await supabase
+    .from('lobby_members')
+    .delete()
+    .eq('lobby_id', lobbyId)
+    .eq('user_id', targetUserId)
+
+  if (kickError) return { error: kickError.message }
+
+  // Tell Next.js to refresh the lobby page so the kicked user disappears
+  revalidatePath(`/lobby/${lobbyId}`)
   return { success: true }
 }
