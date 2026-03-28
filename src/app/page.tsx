@@ -2,7 +2,7 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-
+import Footer from '../components/Footer'
 import { History, Users, Info, Clock, ShieldAlert, Star, LogIn } from 'lucide-react'
 
 export default async function LandingPage() {
@@ -138,8 +138,10 @@ export default async function LandingPage() {
             </div>
           </div>
         </div>
-
+      <Footer/>
       </main>
+      
     </div>
+    
   )
 }

@@ -6,6 +6,7 @@ import { Users, Info, Clock, ShieldAlert, Star, Calendar } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
 import LobbyGrid from '@/src/components/LobbyGrid'
+import Footer from '@/src/components/Footer'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -190,7 +191,7 @@ const timeStr = matchDate.toLocaleTimeString('en-US', {
             </div>
           </div>
         </div>
-
+        <Footer />
       </main>
     </div>
   )

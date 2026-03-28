@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Trophy, Target, Activity, Hash, Crown, LogOut, User as UserIcon } from 'lucide-react'
-
+import Footer from '@/src/components/Footer'
 export default async function ProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -132,6 +132,8 @@ export default async function ProfilePage() {
         </div>
 
       </main>
+      <Footer />
+
     </div>
   )
 }
@@ -147,5 +149,6 @@ function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, lab
       <div className="text-3xl font-black text-white">{value}</div>
       {subValue && <div className="mt-1 text-xs font-semibold text-ipl-accent">{subValue}</div>}
     </div>
+
   )
 }

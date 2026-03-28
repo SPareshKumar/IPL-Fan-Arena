@@ -6,6 +6,7 @@ import DraftInterface from '@/src/components/DraftInterface'
 import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 import LobbyModeration from '@/src/components/LobbyModeration'
 import LobbyListener from '@/src/components/LobbyListener'
+import Footer from '@/src/components/Footer'
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -156,6 +157,8 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           </form>
         </div>
       )}
+      <Footer />
+
     </div>
   )
 }

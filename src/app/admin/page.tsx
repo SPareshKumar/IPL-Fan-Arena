@@ -5,6 +5,7 @@ import { ShieldCheck, Plus, ArrowLeft, Calendar } from 'lucide-react'
 import CreateMatchForm from '@/src/components/CreateMatchForm'
 import AdminStatsManager from '@/src/components/AdminStatsManager'
 import DeleteMatchButton from '@/src/components/DeleteMatchButton'
+import Footer from '@/src/components/Footer'
 
 // Define the 10 IPL Teams for the dropdowns
 const IPL_TEAMS = ['CSK', 'DC', 'GT', 'KKR', 'LSG', 'MI', 'PBKS', 'RR', 'RCB', 'SRH']
@@ -122,6 +123,8 @@ export default async function AdminDashboard() {
         </div>
         <AdminStatsManager matches={matches || []} />
       </div>
+          <Footer />
     </div>
+
   )
 }
