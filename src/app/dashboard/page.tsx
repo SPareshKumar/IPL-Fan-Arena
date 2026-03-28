@@ -78,8 +78,17 @@ export default async function DashboardPage() {
               scheduleMatches?.map(match => {
                 const isLive = match.status === 'live'
                 const matchDate = new Date(match.match_time)
-                const dateStr = matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                const timeStr = matchDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                const dateStr = matchDate.toLocaleDateString('en-US', { 
+  timeZone: 'Asia/Kolkata',
+  month: 'short', 
+  day: 'numeric' 
+})
+
+const timeStr = matchDate.toLocaleTimeString('en-US', { 
+  timeZone: 'Asia/Kolkata',
+  hour: 'numeric', 
+  minute: '2-digit' 
+})
 
                 return (
                   <div key={match.id} className="min-w-[200px] md:min-w-0 md:w-full shrink-0 rounded-lg border border-gray-800 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
@@ -119,7 +128,7 @@ export default async function DashboardPage() {
               <p className="truncate text-sm font-bold text-white transition-colors group-hover:text-ipl-gold">
                 {user.user_metadata?.full_name || 'My Profile'}
               </p>
-              <p className="text-xs text-gray-400">View Stats & History</p>
+              <p className="text-xs text-gray-400">View Profile</p>
             </div>
           </Link>
         </div>

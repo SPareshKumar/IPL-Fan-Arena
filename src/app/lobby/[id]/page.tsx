@@ -5,6 +5,7 @@ import { ArrowLeft, LogOut } from 'lucide-react'
 import DraftInterface from '@/src/components/DraftInterface'
 import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 import LobbyModeration from '@/src/components/LobbyModeration'
+import LobbyListener from '@/src/components/LobbyListener'
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -87,6 +88,8 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="flex min-h-screen flex-col bg-ipl-bg text-white">
+      {/* THE INVISIBLE REALTIME BOUNCER */}
+      <LobbyListener lobbyId={lobby.id} userId={user.id} />
       
       <header className="flex items-center justify-between border-b border-gray-800 bg-ipl-card p-4 shadow-md">
         <div className="flex items-center gap-4">

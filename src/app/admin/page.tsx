@@ -2,9 +2,9 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldCheck, Plus, ArrowLeft, Calendar } from 'lucide-react'
-import { createMatch } from '@/src/app/actions/admin'
 import CreateMatchForm from '@/src/components/CreateMatchForm'
 import AdminStatsManager from '@/src/components/AdminStatsManager'
+import DeleteMatchButton from '@/src/components/DeleteMatchButton'
 
 // Define the 10 IPL Teams for the dropdowns
 const IPL_TEAMS = ['CSK', 'DC', 'GT', 'KKR', 'LSG', 'MI', 'PBKS', 'RR', 'RCB', 'SRH']
@@ -17,13 +17,11 @@ export default async function AdminDashboard() {
   if (!user) redirect('/login')
 
   // --- THE DEBUGGER ---
-  // Look at your VS Code terminal when you load the page!
   console.log("Supabase sees this email:", user.email)
 
   // 2. AUTHORIZATION: Change this to your exact Google email
   const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
   
-  // We use .toLowerCase() to prevent errors if Google returns "Paresh@gmail.com" instead of "paresh@gmail.com"
   if (user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     console.log("ACCESS DENIED: Emails do not match.")
     redirect('/dashboard') 
@@ -91,19 +89,29 @@ export default async function AdminDashboard() {
                       </div>
                     </div>
                     
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-white mb-1">
-                        {new Date(match.match_time).toLocaleString('en-IN', { 
-                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                        })}
+                    <div className="flex items-center">
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-white mb-1">
+                          {new Date(match.match_time).toLocaleString('en-IN', { 
+                            timeZone: 'Asia/Kolkata',
+                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
+                          match.status === 'upcoming' ? 'bg-blue-500/20 text-blue-400' : 
+                          match.status === 'live' ? 'bg-red-500/20 text-red-400' : 
+                          'bg-gray-700 text-gray-300'
+                        }`}>
+                          {match.status}
+                        </span>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
-                        match.status === 'upcoming' ? 'bg-blue-500/20 text-blue-400' : 
-                        match.status === 'live' ? 'bg-red-500/20 text-red-400' : 
-                        'bg-gray-700 text-gray-300'
-                      }`}>
-                        {match.status}
-                      </span>
+                      
+                      {/* NEW DELETE BUTTON */}
+                      <DeleteMatchButton 
+                        matchId={match.id} 
+                        team1={match.team1} 
+                        team2={match.team2} 
+                      />
                     </div>
                   </div>
                 ))

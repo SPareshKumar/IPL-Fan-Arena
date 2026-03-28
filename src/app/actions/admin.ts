@@ -188,3 +188,29 @@ export async function updateMatchStatus(matchId: number, newStatus: string) {
   revalidatePath('/', 'layout') 
   return { success: true }
 }
+
+export async function deleteMatch(matchId: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  const ADMIN_EMAIL = 's.paresh2005@gmail.com' 
+  if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    return { error: 'Unauthorized: Admin only.' }
+  }
+
+  // Optional: If you use the admin/god-mode client for bypass, use that here.
+  // Otherwise, the standard supabase client is fine if RLS allows it.
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('id', matchId)
+
+  if (error) {
+    // If you get a foreign key error, it means lobbies are already attached to this match!
+    if (error.code === '23503') return { error: 'Cannot delete: Lobbies exist for this match.' }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin')
+  return { success: true }
+}
