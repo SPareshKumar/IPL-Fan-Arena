@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Trophy, Target, Activity, Hash, Crown, LogOut, User as UserIcon } from 'lucide-react'
 import Footer from '@/src/components/Footer'
+
 export default async function ProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -91,7 +92,8 @@ export default async function ProfilePage() {
         <div className="flex flex-col md:flex-row items-center gap-6 mb-10 bg-ipl-card/50 p-8 rounded-2xl border border-gray-800">
           <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-ipl-gold shadow-[0_0_20px_rgba(234,179,8,0.2)]">
             {avatarUrl ? (
-              <Image src={avatarUrl} alt="Profile" fill className="object-cover" />
+              // THE FIX: Added unoptimized to prevent Next.js crashes with external Google URLs
+              <Image src={avatarUrl} alt="Profile" fill unoptimized className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400">
                 <UserIcon size={40} />
@@ -133,7 +135,6 @@ export default async function ProfilePage() {
 
       </main>
       <Footer />
-
     </div>
   )
 }
@@ -142,13 +143,12 @@ export default async function ProfilePage() {
 function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, label: string, value: string, subValue?: string }) {
   return (
     <div className="flex flex-col justify-center rounded-xl border border-gray-800 bg-ipl-card p-6 shadow-lg transition-all hover:border-gray-600">
-      <div className="mb-3 flex items-center gap-2 text-gray-400">
+      <div className="mb-3 flex flex-col md:flex-row md:items-center gap-2 text-gray-400">
         {icon}
         <span className="text-xs font-bold uppercase tracking-wider">{label}</span>
       </div>
       <div className="text-3xl font-black text-white">{value}</div>
       {subValue && <div className="mt-1 text-xs font-semibold text-ipl-accent">{subValue}</div>}
     </div>
-
   )
 }

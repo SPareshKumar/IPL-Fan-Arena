@@ -51,6 +51,10 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
             </div>
 
             <form action={handleSubmit} className="space-y-5">
+              
+              {/* HIDDEN FIELD to safely pass the lobby type to your backend action */}
+              <input type="hidden" name="type" value="single" />
+
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Lobby Name</label>
                 <input 
@@ -62,16 +66,6 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Game Mode</label>
-                <select 
-                  name="type" 
-                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all"
-                >
-                  <option value="single">Single Match (5 Players)</option>
-                  <option value="tournament">Tournament Window (11 Players)</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Select Fixture</label>
                 <select 

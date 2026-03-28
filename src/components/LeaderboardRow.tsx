@@ -72,16 +72,14 @@ export default function LeaderboardRow({
       {/* THE EXPANDABLE SQUAD REVEAL */}
       {isExpanded && (
         <div className="border-t border-gray-800/50 bg-black/20 p-3 md:p-5">
-          {/* THE FIX: Changed grid-cols-1 to grid-cols-2, reduced gap on mobile */}
           <div className="grid grid-cols-2 gap-2 md:gap-3 lg:grid-cols-3 xl:grid-cols-4">
             {player.squad.map(sq => (
               <div key={sq.id} className={`flex items-center justify-between rounded-lg border p-2 md:p-3 ${
                 sq.isCaptain ? 'border-ipl-gold/50 bg-ipl-gold/5' : 'border-gray-800 bg-black/40'
               }`}>
-                {/* min-w-0 is a CSS trick that allows flex children to truncate properly! */}
+                {/* min-w-0 allows flex children to truncate properly */}
                 <div className="min-w-0 flex-1 pr-2">
                   <div className="flex items-center gap-1 md:gap-2">
-                    {/* THE FIX: Added truncate and responsive text sizes */}
                     <span className="truncate font-bold text-white text-xs md:text-sm">{sq.name}</span>
                     {sq.isCaptain && (
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-ipl-gold text-[9px] md:text-[10px] font-black text-black">
@@ -98,7 +96,7 @@ export default function LeaderboardRow({
                   <span className={`block font-black text-sm md:text-base ${sq.isCaptain ? 'text-ipl-gold' : 'text-gray-300'}`}>
                     {sq.pointsScored}
                   </span>
-                  <span className="block text-[9px] md:text-[10px] text-gray-500 mt[-2px]">pts</span>
+                  <span className="block text-[9px] md:text-[10px] text-gray-500 -mt-[2px]">pts</span>
                 </div>
               </div>
             ))}

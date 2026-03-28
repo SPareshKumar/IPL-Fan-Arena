@@ -13,29 +13,38 @@ export default async function LobbyLeaderboard({
 }) {
   const supabase = await createClient()
 
-  // 1. Fetch Drafted Teams
+  // 1. Fetch Drafted Teams (Include bonus_predictions)
   const { data: teams } = await supabase.from('user_teams').select('*').eq('lobby_id', lobbyId)
 
-  // 2. Fetch Match Stats
+  // 2. Fetch Match Stats AND the Match Bonus Answers
   const { data: stats } = await supabase.from('match_player_stats').select('player_id, fantasy_points').eq('match_id', targetId)
+  
+  // FIX: Fetch the actual bonus answers for this match
+  const { data: match } = await supabase.from('matches').select('bonus_answers').eq('id', targetId).single()
 
   // 3. Fetch User Profiles
   const userIds = teams?.map(t => t.user_id) || []
   const { data: profiles } = await supabase.from('profiles').select('id, display_name').in('id', userIds)
 
-  // 4. NEW: Fetch Master Roster (so we know who player ID '5' actually is)
-  const { data: allPlayers } = await supabase.from('players').select('id, name, team, role')
+  // 4. Fetch Player Info
+  const draftedPlayerIds = Array.from(new Set(teams?.flatMap(t => t.players) || []))
+  const { data: allPlayers } = await supabase
+    .from('players')
+    .select('id, name, team, role')
+    .in('id', draftedPlayerIds)
 
   // Create fast-lookup Maps
   const statsMap = new Map(stats?.map(s => [s.player_id, s.fantasy_points]) || [])
   const profileMap = new Map(profiles?.map(p => [p.id, p.display_name]) || [])
   const playerMap = new Map(allPlayers?.map(p => [p.id, p]) || [])
 
-  // 5. THE ADVANCED SCORING ENGINE
+  const correctAnswers = match?.bonus_answers || {}
+
+  // 5. THE UPDATED SCORING ENGINE
   const leaderboard = teams?.map(team => {
     let totalScore = 0
 
-    // Build the detailed squad array for the UI
+    // A. Calculate Player Points
     const squadDetails = team.players.map((playerId: number) => {
       const basePoints = statsMap.get(playerId) || 0
       const isCaptain = playerId === team.captain_id
@@ -54,12 +63,23 @@ export default async function LobbyLeaderboard({
       }
     })
 
+    // B. FIX: Calculate Bonus Points on the fly
+    const userPreds = team.bonus_predictions || {}
+    Object.keys(correctAnswers).forEach(key => {
+      const adminAns = String(correctAnswers[key] || '').trim().toLowerCase()
+      const userAns = String(userPreds[key] || '').trim().toLowerCase()
+      
+      if (adminAns !== '' && adminAns === userAns) {
+        totalScore += 10
+      }
+    })
+
     return {
       userId: team.user_id,
       name: profileMap.get(team.user_id) || 'Unknown Player',
       score: Math.round(totalScore),
       isCurrentUser: team.user_id === currentUserId,
-      squad: squadDetails // Pass the rich squad data down!
+      squad: squadDetails
     }
   }).sort((a, b) => b.score - a.score)
 
@@ -70,7 +90,7 @@ export default async function LobbyLeaderboard({
           <Trophy size={32} />
           Live Leaderboard
         </h2>
-        <p className="text-gray-400 mt-2">Rankings are updated dynamically based on live match stats.</p>
+        <p className="text-gray-400 mt-2">Rankings are updated dynamically based on live match stats and bonus predictions.</p>
       </div>
 
       <div className="space-y-4">

@@ -56,11 +56,9 @@ export default function LobbyGrid({ lobbies }: { lobbies: any[] }) {
               <Link href={`/lobby/${lobby.id}`} key={lobby.id}>
                 <div className="flex h-full cursor-pointer flex-col justify-between rounded-xl border border-gray-800 bg-ipl-card p-5 md:p-6 transition-all hover:border-gray-500 hover:shadow-lg">
                   <div>
-                    <div className="mb-4 flex items-start justify-between">
-                      <h3 className="truncate pr-2 text-lg md:text-xl font-bold">{lobby.name}</h3>
-                      <span className="whitespace-nowrap rounded-full bg-blue-500/10 px-2 md:px-3 py-1 text-[10px] md:text-xs font-semibold text-ipl-accent capitalize">
-                        {lobby.lobby_type === 'single' ? 'Single' : 'Tournament'}
-                      </span>
+                    {/* THE FIX: Removed the Single/Tournament badge and simplified the layout */}
+                    <div className="mb-4">
+                      <h3 className="truncate text-lg md:text-xl font-bold">{lobby.name}</h3>
                     </div>
                     
                     <div className="mb-4 md:mb-6 space-y-2">

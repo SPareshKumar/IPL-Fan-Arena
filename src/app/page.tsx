@@ -111,8 +111,8 @@ export default async function LandingPage() {
             <div className="space-y-1 md:space-y-2">
               <div className="flex items-center gap-2 text-ipl-gold"><ShieldAlert size={16} className="md:w-[18px] md:h-[18px]"/> <h3 className="font-bold text-sm md:text-base text-white">Game Modes</h3></div>
               <p className="leading-relaxed text-xs md:text-sm text-gray-400">
-                <strong className="text-white">Single Match:</strong> Draft 5 players for one game.<br/>
-                <strong className="mt-1 block text-white">Tournament:</strong> Draft 11 players for a 5-match window.
+              Build your team, go head-to-head with friends, and earn extra points by answering the bonus questions.
+
               </p>
             </div>
 

@@ -100,7 +100,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           <div>
             <h1 className="text-xl font-bold text-ipl-gold">{lobby.name}</h1>
             <span className="text-xs tracking-wider text-gray-400 uppercase">
-              {matchInfo.team1} vs {matchInfo.team2} • {lobby.lobby_type} Mode
+              {matchInfo.team1} vs {matchInfo.team2} • Single Match
             </span>
           </div>
         </div>
@@ -121,7 +121,6 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
       {shouldShowDraft ? (
         <DraftInterface 
           players={players || []} 
-          lobbyType={lobby.lobby_type} 
           lobbyId={lobby.id} 
           targetId={matchInfo.id} 
         />
@@ -138,7 +137,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         <div className="mt-8 mb-12 w-full max-w-7xl mx-auto px-4">
           <LobbyModeration 
             lobbyId={lobby.id} 
-            teams={participants} // <-- Now passing the clean data!
+            teams={participants}
           />
         </div>
       )}

@@ -80,16 +80,16 @@ export default async function DashboardPage() {
                 const isLive = match.status === 'live'
                 const matchDate = new Date(match.match_time)
                 const dateStr = matchDate.toLocaleDateString('en-US', { 
-  timeZone: 'Asia/Kolkata',
-  month: 'short', 
-  day: 'numeric' 
-})
+                  timeZone: 'Asia/Kolkata',
+                  month: 'short', 
+                  day: 'numeric' 
+                })
 
-const timeStr = matchDate.toLocaleTimeString('en-US', { 
-  timeZone: 'Asia/Kolkata',
-  hour: 'numeric', 
-  minute: '2-digit' 
-})
+                const timeStr = matchDate.toLocaleTimeString('en-US', { 
+                  timeZone: 'Asia/Kolkata',
+                  hour: 'numeric', 
+                  minute: '2-digit' 
+                })
 
                 return (
                   <div key={match.id} className="min-w-[200px] md:min-w-0 md:w-full shrink-0 rounded-lg border border-gray-800 bg-gray-900/40 p-3 transition-colors hover:border-gray-600">
@@ -164,9 +164,7 @@ const timeStr = matchDate.toLocaleTimeString('en-US', {
             <div className="space-y-1 md:space-y-2">
               <div className="flex items-center gap-2 text-ipl-gold"><ShieldAlert size={16} className="md:w-[18px] md:h-[18px]"/> <h3 className="font-bold text-sm md:text-base">Game Modes</h3></div>
               <p className="leading-relaxed text-xs md:text-sm text-gray-400">
-                <strong className="text-white">Single Match:</strong> Draft 5 players for one game.<br/>
-                <strong className="mt-1 block text-white">Tournament:</strong> Draft 11 players for a 5-match window.
-              </p>
+               Build your team, go head-to-head with friends, and earn extra points by answering the bonus questions.              </p>
             </div>
 
             <div className="space-y-1 md:space-y-2">

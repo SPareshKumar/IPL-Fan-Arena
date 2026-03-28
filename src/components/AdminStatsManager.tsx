@@ -1,10 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { getMatchRosterAndStats, updateManualScores } from '@/src/app/actions/admin'
+import { getMatchRosterAndStats, updateManualScores, updateMatchStatus } from '@/src/app/actions/admin'
 import { toast } from 'sonner'
-import { Database, Save } from 'lucide-react'
-import {updateMatchStatus } from '@/src/app/actions/admin'
+import { Database, Save, Activity } from 'lucide-react'
 
 type Match = { id: number; team1: string; team2: string; match_time: string }
 type Player = { id: number; name: string; team: string; role: string }
@@ -12,151 +11,156 @@ type Player = { id: number; name: string; team: string; role: string }
 export default function AdminStatsManager({ matches }: { matches: Match[] }) {
   const [selectedMatch, setSelectedMatch] = useState('')
   const [players, setPlayers] = useState<Player[]>([])
-  const [scores, setScores] = useState<Record<number, number>>({})
+  const [scores, setScores] = useState<Record<number, number | string>>({})
+  const [bonusAnswers, setBonusAnswers] = useState<Record<string, string>>({ winner: '', sixes: '', pp_king: '' })
   const [isLoading, setIsLoading] = useState(false)
 
-  // Fires when you pick a match from the dropdown
   async function handleMatchChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const matchId = e.target.value
-    setSelectedMatch(matchId)
-    
-    if (!matchId) {
+    const id = e.target.value
+    setSelectedMatch(id)
+    if (!id) {
       setPlayers([])
       return
     }
-
     setIsLoading(true)
-    const { players: fetchedPlayers, existingStats } = await getMatchRosterAndStats(Number(matchId))
-    setPlayers(fetchedPlayers)
+    const { players: fetchedPlayers, existingStats, bonusAnswers: existingBonus } = await getMatchRosterAndStats(Number(id))
     
-    // Pre-fill inputs with any existing database scores
-    const initialScores: Record<number, number> = {}
-    existingStats.forEach((stat: { player_id: number; fantasy_points: number }) => {
+    setPlayers(fetchedPlayers)
+    setBonusAnswers(existingBonus || { winner: '', sixes: '', pp_king: '' })
+    
+    const initialScores: Record<number, number | string> = {}
+    existingStats.forEach((stat: any) => {
       initialScores[stat.player_id] = stat.fantasy_points
     })
     setScores(initialScores)
     setIsLoading(false)
   }
 
-  // Updates the specific player's score in state as you type
   function handleScoreChange(playerId: number, value: string) {
-    setScores(prev => ({ ...prev, [playerId]: Number(value) || 0 }))
+    setScores(prev => ({ ...prev, [playerId]: value === '' ? '' : Number(value) }))
   }
 
-  // Fires when you click the giant Save button
-  async function handleSave() {
+  async function handleSaveAll() {
     if (!selectedMatch) return
     setIsLoading(true)
-    
-    // Package it into the exact array shape our Server Action expects
     const payload = players.map(p => ({
       playerId: p.id,
-      points: scores[p.id] || 0
+      points: Number(scores[p.id]) || 0
     }))
 
-    const result = await updateManualScores(Number(selectedMatch), payload)
+    const result = await updateManualScores(Number(selectedMatch), payload, bonusAnswers)
     
     if (result.error) toast.error(result.error)
-    else toast.success('Leaderboards instantly updated!')
+    else toast.success('Player scores and Bonus answers saved!')
     
     setIsLoading(false)
   }
+
   async function handleStatusChange(status: string) {
     if (!selectedMatch) return
     setIsLoading(true)
     const result = await updateMatchStatus(Number(selectedMatch), status)
     if (result.error) toast.error(result.error)
-    else toast.success(`Match status updated to: ${status.toUpperCase()}`)
+    else toast.success(`Match is now: ${status.toUpperCase()}`)
     setIsLoading(false)
   }
 
+  const currentMatch = matches.find(m => m.id === Number(selectedMatch))
+  const teams = currentMatch ? [currentMatch.team1, currentMatch.team2] : []
+
   return (
     <div className="mt-10 bg-ipl-card border border-gray-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <Database className="text-ipl-accent" /> Manual Override Engine
+          <Database className="text-ipl-accent" /> Match Stats & Control
         </h2>
         
         <select 
           value={selectedMatch} 
           onChange={handleMatchChange}
-          className="bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-ipl-gold focus:outline-none w-64"
+          className="bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-ipl-gold focus:outline-none w-full sm:w-64"
         >
-          <option value="">-- Select Match to Grade --</option>
-          {matches.map(m => (
-            <option key={m.id} value={m.id}>{m.team1} vs {m.team2}</option>
-          ))}
+          <option value="">-- Select Match --</option>
+          {matches.map(m => <option key={m.id} value={m.id}>{m.team1} vs {m.team2}</option>)}
         </select>
       </div>
 
-      {isLoading && <p className="text-gray-400 text-center py-10 animate-pulse">Fetching database records...</p>}
+      {isLoading && <p className="text-gray-400 text-center py-10 animate-pulse">Processing...</p>}
 
-      {!isLoading && players.length > 0 && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {players.map(player => (
-              <div key={player.id} className="flex items-center justify-between bg-black/40 border border-gray-800 rounded-lg p-3 hover:border-gray-700 transition-colors">
-                <div>
-                  <div className="font-bold text-white">{player.name}</div>
-                  <div className="text-xs text-gray-500">{player.team} • {player.role}</div>
+      {!isLoading && selectedMatch && (
+        <div className="space-y-10 animate-in fade-in duration-300">
+          
+          {/* 1. BONUS QUESTIONS SECTION */}
+          <section>
+            <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-widest">Bonus Answer Keys</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-ipl-gold/5 border border-ipl-gold/20 rounded-xl">
+              {['winner', 'sixes', 'pp_king'].map(q => (
+                <div key={q}>
+                  <label className="text-[10px] font-bold text-ipl-gold uppercase mb-2 block">{q.replace('_', ' ')}</label>
+                  <select 
+                    value={bonusAnswers[q] || ''} 
+                    onChange={(e) => setBonusAnswers(prev => ({...prev, [q]: e.target.value}))}
+                    className="w-full bg-gray-800 border border-gray-700 p-2 rounded text-xs text-white outline-none focus:border-ipl-gold"
+                  >
+                    <option value="">-- Select Result --</option>
+                    {teams.map(t => <option key={t} value={t}>{t}</option>)}
+                    {q !== 'winner' && <option value="Tie">Tie</option>}
+                  </select>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={scores[player.id] === undefined ? '' : scores[player.id]}
-                    onChange={(e) => handleScoreChange(player.id, e.target.value)}
-                    placeholder="0"
-                    className="w-20 bg-gray-900 border border-gray-700 rounded p-2 text-right text-ipl-gold font-black focus:border-ipl-gold focus:ring-1 focus:ring-ipl-gold outline-none"
-                  />
-                  <span className="text-xs text-gray-500">pts</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </section>
 
+          {/* 2. PLAYER SCORES SECTION */}
+          <section>
+            <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-widest">Player Performance Points</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar border-b border-gray-800 pb-6">
+              {players.map(player => (
+                <div key={player.id} className="flex items-center justify-between bg-black/40 border border-gray-800 rounded-lg p-3">
+                  <div>
+                    <div className="font-bold text-white text-sm">{player.name}</div>
+                    <div className="text-[10px] text-gray-500">{player.team} • {player.role}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={scores[player.id] ?? ''}
+                      onChange={(e) => handleScoreChange(player.id, e.target.value)}
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1.5 text-right text-ipl-gold font-bold text-sm"
+                    />
+                    <span className="text-[10px] text-gray-500 uppercase">pts</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 3. SAVE BUTTON */}
           <button 
-            onClick={handleSave}
+            onClick={handleSaveAll}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 bg-ipl-gold hover:bg-ipl-gold-hover text-black font-black py-4 rounded-xl transition-all hover:scale-[1.01]"
+            className="w-full flex items-center justify-center gap-2 bg-ipl-gold hover:bg-ipl-gold-hover text-black font-black py-4 rounded-xl transition-all shadow-lg"
           >
             <Save size={20} />
-            OVERRIDE AND PUSH SCORES
+            SAVE SCORES & BONUS ANSWERS
           </button>
-          {/* --- MATCH LIFECYCLE CONTROLLER --- */}
-          <div className="mt-8 border-t border-gray-800 pt-6">
-            <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Match Lifecycle Control</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <button 
-                onClick={() => handleStatusChange('upcoming')}
-                className="bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
-              >
-                Set UPCOMING
-              </button>
-              <button 
-                onClick={() => handleStatusChange('live')}
-                className="bg-red-900/50 hover:bg-red-600 border border-red-700 text-white py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                Set LIVE
-              </button>
-              <button 
-                onClick={() => handleStatusChange('completed')}
-                className="bg-green-900/50 hover:bg-green-600 border border-green-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
-              >
-                Set COMPLETED
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              Setting a match to LIVE or COMPLETED will lock all drafts for this lobby.
-            </p>
-          </div>
-        </div>
-      )}
 
-      {!isLoading && selectedMatch && players.length === 0 && (
-        <p className="text-center text-gray-500 py-10 border border-dashed border-gray-800 rounded-xl">
-          No players found for these teams.
-        </p>
+          {/* 4. MATCH STATUS BUTTONS */}
+          <section className="border-t border-gray-800 pt-8">
+            <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-widest">Match Lifecycle Control</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button onClick={() => handleStatusChange('upcoming')} className="bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-lg font-bold text-sm transition-colors">Set UPCOMING</button>
+              <button onClick={() => handleStatusChange('live')} className="bg-red-900/40 hover:bg-red-600 border border-red-700 text-white py-3 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Set LIVE
+              </button>
+              <button onClick={() => handleStatusChange('completed')} className="bg-green-900/40 hover:bg-green-600 border border-green-700 text-white py-3 rounded-lg font-bold text-sm transition-colors">Set COMPLETED</button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-4 text-center italic">
+              Note: "Set Completed" triggers the final points calculation for all users in all lobbies.
+            </p>
+          </section>
+
+        </div>
       )}
     </div>
   )

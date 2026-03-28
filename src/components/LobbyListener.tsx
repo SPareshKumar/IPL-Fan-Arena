@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/src/lib/supabase/client' // Make sure you have a client Supabase file!
+import { createClient } from '@/src/lib/supabase/client'
 import { toast } from 'sonner'
 
 export default function LobbyListener({ 
@@ -13,13 +13,14 @@ export default function LobbyListener({
   userId: string; 
 }) {
   const router = useRouter()
-  // Note: Initialize your Supabase client however you do it for client components
-  const supabase = createClient() 
 
   useEffect(() => {
+    // FIX: Instantiate the client INSIDE the effect to prevent infinite re-renders
+    const supabase = createClient() 
+
     // Subscribe to DELETE events on the lobby_members table
     const channel = supabase
-      .channel('kicked-listener')
+      .channel(`kicked-listener-${lobbyId}`) // Added lobbyId to make channel string unique
       .on(
         'postgres_changes',
         {
@@ -43,7 +44,7 @@ export default function LobbyListener({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [lobbyId, userId, router, supabase])
+  }, [lobbyId, userId, router]) // Removed supabase from dependencies
 
   return null // This component is invisible!
 }
