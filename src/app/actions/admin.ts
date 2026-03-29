@@ -166,33 +166,20 @@ export async function syncCricbuzzScores(matchId: number) {
   const { data: { user } } = await supabase.auth.getUser();
   if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return { error: 'Unauthorized' };
 
-  // 1. Get the Cricbuzz Match ID from the database
   const { data: match } = await supabase.from('matches').select('cricbuzz_match_id, team1, team2').eq('id', matchId).single();
-  if (!match?.cricbuzz_match_id) {
-    return { error: 'No Cricbuzz Match ID set for this match. Please set it first.' };
-  }
+  if (!match?.cricbuzz_match_id) return { error: 'No Cricbuzz Match ID set.' };
 
-  // 2. Scrape the scores
-  const scrapedScores = await scrapeAndCalculatePoints(match.cricbuzz_match_id);
-  if (!scrapedScores) {
-    return { error: 'Failed to scrape scores. Check the Match ID.' };
-  }
+  const scrapedData = await scrapeAndCalculatePoints(match.cricbuzz_match_id);
+  if (!scrapedData) return { error: 'Failed to scrape scores.' };
 
-  // 3. Fetch the players for this match to map the names to their database IDs
-  const { data: players } = await supabase
-    .from('players')
-    .select('id, name, cricbuzz_name')
-    .in('team', [match.team1, match.team2]);
+  const scrapedScores = scrapedData.playerPoints; // Use the nested points object
 
-  if (!players) return { error: 'Failed to fetch players for mapping.' };
+  const { data: players } = await supabase.from('players').select('id, name, cricbuzz_name').in('team', [match.team1, match.team2]);
+  if (!players) return { error: 'Failed to fetch players.' };
 
-  // 4. Map scraped scores to player IDs
   const mappedScores: Record<number, number> = {};
-  
   players.forEach((player) => {
-    // Try to match using cricbuzz_name, fallback to name
     const matchName = player.cricbuzz_name || player.name;
-    // Check if the scraper found points for this name
     if (scrapedScores[matchName] !== undefined) {
       mappedScores[player.id] = scrapedScores[matchName];
     }
@@ -212,4 +199,16 @@ export async function setCricbuzzMatchId(matchId: number, cricbuzzId: string) {
   
   revalidatePath('/admin');
   return { success: true };
+}
+
+export async function toggleAutomation(matchId: number, isAutomated: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return { error: 'Unauthorized' }
+
+  const { error } = await supabase.from('matches').update({ is_automated: isAutomated }).eq('id', matchId)
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin')
+  return { success: true }
 }

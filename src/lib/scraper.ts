@@ -1,19 +1,8 @@
 import * as cheerio from 'cheerio';
 
-// Adjusted to Official Standard T20 Fantasy Rules
 const SCORING = {
-  RUN: 1,
-  FOUR: 1,
-  SIX: 2,
-  HALF_CENTURY: 8,   // Fixed from 15
-  CENTURY: 16,       // Fixed from 30
-  DUCK: -2,
-  WICKET: 25,
-  THREE_WICKET: 4,   // Fixed from 8
-  FOUR_WICKET: 8,    // Fixed from 16
-  FIVE_WICKET: 16,   // Fixed from 24
-  MAIDEN: 12,        // Standard is usually 12 for T20
-  CATCH: 8
+  RUN: 1, FOUR: 1, SIX: 2, HALF_CENTURY: 8, CENTURY: 16, DUCK: -2,
+  WICKET: 25, THREE_WICKET: 4, FOUR_WICKET: 8, FIVE_WICKET: 16, MAIDEN: 12, CATCH: 8
 };
 
 export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
@@ -27,9 +16,11 @@ export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const playerPoints: Record<string, number> = {};
+    // CHECK IF MATCH IS OVER
+    const statusText = $('.text-cbComplete').text().trim();
+    const isComplete = statusText.length > 0;
 
-    // Prevent double-counting from Cricbuzz's mobile/desktop duplicate HTML
+    const playerPoints: Record<string, number> = {};
     const processedBatters = new Set<string>();
     const processedBowlers = new Set<string>();
 
@@ -44,10 +35,7 @@ export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
       const nameEl = $(el).find('a.text-cbTextLink');
       if (nameEl.length === 0) return; 
 
-      const rawName = nameEl.text();
-      const cleanName = rawName.replace(/\(.*?\)/g, '').trim();
-
-      // If we already parsed this batter (duplicate HTML block), skip them!
+      const cleanName = nameEl.text().replace(/\(.*?\)/g, '').trim();
       if (processedBatters.has(cleanName)) return;
       processedBatters.add(cleanName);
       
@@ -66,12 +54,9 @@ export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
 
       addPoints(cleanName, pts);
 
-      // Fielding Points (Catches) - We don't deduplicate this because a player can catch multiple times
       if (dismissal.startsWith('c ') && dismissal.includes(' b ')) {
         const catcherName = dismissal.substring(2, dismissal.indexOf(' b ')).trim();
-        if (catcherName !== '&') { 
-          addPoints(catcherName, SCORING.CATCH);
-        }
+        if (catcherName !== '&') addPoints(catcherName, SCORING.CATCH);
       }
     });
 
@@ -80,10 +65,7 @@ export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
       const nameEl = $(el).find('a.text-cbTextLink');
       if (nameEl.length === 0) return; 
 
-      const rawName = nameEl.text();
-      const cleanName = rawName.replace(/\(.*?\)/g, '').trim();
-
-      // If we already parsed this bowler, skip them!
+      const cleanName = nameEl.text().replace(/\(.*?\)/g, '').trim();
       if (processedBowlers.has(cleanName)) return;
       processedBowlers.add(cleanName);
       
@@ -99,8 +81,8 @@ export async function scrapeAndCalculatePoints(cricbuzzMatchId: string) {
       addPoints(cleanName, pts);
     });
 
-    console.log("CORRECTED SCRAPED POINTS:", playerPoints);
-    return playerPoints;
+    // Return the new object!
+    return { playerPoints, isComplete, statusText };
 
   } catch (error) {
     console.error("Scraping failed:", error);

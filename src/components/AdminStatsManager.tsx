@@ -1,26 +1,37 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { getMatchRosterAndStats, updateManualScores, updateMatchStatus, syncCricbuzzScores, setCricbuzzMatchId } from '@/src/app/actions/admin'
+import { useState } from 'react'
+import { 
+  getMatchRosterAndStats, 
+  updateManualScores, 
+  updateMatchStatus, 
+  syncCricbuzzScores, 
+  setCricbuzzMatchId, 
+  toggleAutomation 
+} from '@/src/app/actions/admin'
 import { toast } from 'sonner'
 import { Database, Save, Activity, RefreshCw, Link as LinkIcon } from 'lucide-react'
 
-// ... [Keep existing types] ...
-type Match = { id: number; team1: string; team2: string; match_time: string; cricbuzz_match_id?: string }
+type Match = { 
+  id: number; 
+  team1: string; 
+  team2: string; 
+  match_time: string; 
+  cricbuzz_match_id?: string;
+  is_automated?: boolean;
+}
 type Player = { id: number; name: string; team: string; role: string }
 
 export default function AdminStatsManager({ matches }: { matches: Match[] }) {
-  // ... [Keep existing state] ...
   const [selectedMatch, setSelectedMatch] = useState('')
   const [players, setPlayers] = useState<Player[]>([])
   const [scores, setScores] = useState<Record<number, number | string>>({})
   const [bonusAnswers, setBonusAnswers] = useState<Record<string, string>>({ winner: '', sixes: '', pp_king: '' })
   const [isLoading, setIsLoading] = useState(false)
   
-  // NEW STATE: For handling the Cricbuzz ID
+  // For handling the Cricbuzz ID
   const [cricbuzzId, setCricbuzzId] = useState('')
 
-  // ... [Keep existing handleMatchChange, handleScoreChange, handleSaveAll, handleStatusChange] ...
   async function handleMatchChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value
     setSelectedMatch(id)
@@ -75,7 +86,6 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
     setIsLoading(false)
   }
 
-  // NEW FUNCTION: Handle fetching scores
   async function handleFetchScores() {
     if (!selectedMatch) return;
     setIsLoading(true);
@@ -93,7 +103,6 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
     setIsLoading(false);
   }
 
-  // NEW FUNCTION: Save Cricbuzz ID
   async function handleSaveCricbuzzId() {
     if (!selectedMatch || !cricbuzzId) return;
     setIsLoading(true);
@@ -128,8 +137,34 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
       {!isLoading && selectedMatch && (
         <div className="space-y-10 animate-in fade-in duration-300">
           
-          {/* NEW: CRICBUZZ SYNC SECTION */}
-          <section className="bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+          {/* CRICBUZZ SYNC & AUTOMATION SECTION */}
+          <section className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 space-y-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-gray-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-white flex items-center gap-2">
+                    <Activity size={16} className={currentMatch?.is_automated ? "text-green-400" : "text-gray-500"} />
+                    Auto-Pilot Engine
+                  </span>
+                  <span className="text-[10px] text-gray-400">Automatically sets match to LIVE and syncs points every 15 mins.</span>
+                </div>
+              </div>
+              <button 
+                onClick={async () => {
+                  if (!selectedMatch) return;
+                  setIsLoading(true);
+                  const newState = !currentMatch?.is_automated;
+                  const result = await toggleAutomation(Number(selectedMatch), newState);
+                  if (result.error) toast.error(result.error);
+                  else toast.success(`Auto-Pilot turned ${newState ? 'ON' : 'OFF'}`);
+                  setIsLoading(false);
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${currentMatch?.is_automated ? 'bg-green-500' : 'bg-gray-600'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${currentMatch?.is_automated ? 'translate-x-6' : 'translate-x-1'}`}/>
+              </button>
+            </div>
+
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex-1 w-full flex items-center gap-2">
                 <LinkIcon size={16} className="text-gray-400" />
@@ -149,7 +184,7 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
               </div>
               <button 
                 onClick={handleFetchScores}
-                disabled={!cricbuzzId || isLoading}
+                disabled={!cricbuzzId || isLoading || currentMatch?.is_automated}
                 className="w-full md:w-auto flex items-center justify-center gap-2 bg-ipl-accent hover:bg-opacity-80 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
               >
                 <RefreshCw size={16} /> Fetch Live Scores
