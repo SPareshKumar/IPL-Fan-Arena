@@ -1,28 +1,38 @@
 'use client'
 
-import { useState } from 'react'
-import { getMatchRosterAndStats, updateManualScores, updateMatchStatus } from '@/src/app/actions/admin'
+import { useState, useEffect } from 'react'
+import { getMatchRosterAndStats, updateManualScores, updateMatchStatus, syncCricbuzzScores, setCricbuzzMatchId } from '@/src/app/actions/admin'
 import { toast } from 'sonner'
-import { Database, Save, Activity } from 'lucide-react'
+import { Database, Save, Activity, RefreshCw, Link as LinkIcon } from 'lucide-react'
 
-type Match = { id: number; team1: string; team2: string; match_time: string }
+// ... [Keep existing types] ...
+type Match = { id: number; team1: string; team2: string; match_time: string; cricbuzz_match_id?: string }
 type Player = { id: number; name: string; team: string; role: string }
 
 export default function AdminStatsManager({ matches }: { matches: Match[] }) {
+  // ... [Keep existing state] ...
   const [selectedMatch, setSelectedMatch] = useState('')
   const [players, setPlayers] = useState<Player[]>([])
   const [scores, setScores] = useState<Record<number, number | string>>({})
   const [bonusAnswers, setBonusAnswers] = useState<Record<string, string>>({ winner: '', sixes: '', pp_king: '' })
   const [isLoading, setIsLoading] = useState(false)
+  
+  // NEW STATE: For handling the Cricbuzz ID
+  const [cricbuzzId, setCricbuzzId] = useState('')
 
+  // ... [Keep existing handleMatchChange, handleScoreChange, handleSaveAll, handleStatusChange] ...
   async function handleMatchChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value
     setSelectedMatch(id)
     if (!id) {
       setPlayers([])
+      setCricbuzzId('')
       return
     }
     setIsLoading(true)
+    const currentMatchData = matches.find(m => m.id === Number(id))
+    setCricbuzzId(currentMatchData?.cricbuzz_match_id || '')
+
     const { players: fetchedPlayers, existingStats, bonusAnswers: existingBonus } = await getMatchRosterAndStats(Number(id))
     
     setPlayers(fetchedPlayers)
@@ -65,6 +75,34 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
     setIsLoading(false)
   }
 
+  // NEW FUNCTION: Handle fetching scores
+  async function handleFetchScores() {
+    if (!selectedMatch) return;
+    setIsLoading(true);
+    toast.info('Fetching live scores from Cricbuzz...');
+    
+    const result = await syncCricbuzzScores(Number(selectedMatch));
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.scores) {
+      // Merge the new scores with any existing ones (scraper overwrites existing)
+      setScores(prev => ({ ...prev, ...result.scores }));
+      toast.success('Scores fetched successfully! Review and hit Save.');
+    }
+    setIsLoading(false);
+  }
+
+  // NEW FUNCTION: Save Cricbuzz ID
+  async function handleSaveCricbuzzId() {
+    if (!selectedMatch || !cricbuzzId) return;
+    setIsLoading(true);
+    const result = await setCricbuzzMatchId(Number(selectedMatch), cricbuzzId);
+    if (result.error) toast.error(result.error);
+    else toast.success('Cricbuzz ID saved!');
+    setIsLoading(false);
+  }
+
   const currentMatch = matches.find(m => m.id === Number(selectedMatch))
   const teams = currentMatch ? [currentMatch.team1, currentMatch.team2] : []
 
@@ -90,6 +128,35 @@ export default function AdminStatsManager({ matches }: { matches: Match[] }) {
       {!isLoading && selectedMatch && (
         <div className="space-y-10 animate-in fade-in duration-300">
           
+          {/* NEW: CRICBUZZ SYNC SECTION */}
+          <section className="bg-gray-900/50 p-4 rounded-xl border border-gray-800">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1 w-full flex items-center gap-2">
+                <LinkIcon size={16} className="text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Cricbuzz Match ID (e.g. 149618)" 
+                  value={cricbuzzId}
+                  onChange={(e) => setCricbuzzId(e.target.value)}
+                  className="flex-1 bg-black border border-gray-700 p-2 rounded text-xs text-white outline-none focus:border-ipl-gold"
+                />
+                <button 
+                  onClick={handleSaveCricbuzzId}
+                  className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded text-xs font-bold text-white transition-colors"
+                >
+                  Save ID
+                </button>
+              </div>
+              <button 
+                onClick={handleFetchScores}
+                disabled={!cricbuzzId || isLoading}
+                className="w-full md:w-auto flex items-center justify-center gap-2 bg-ipl-accent hover:bg-opacity-80 text-white font-bold py-2 px-4 rounded transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={16} /> Fetch Live Scores
+              </button>
+            </div>
+          </section>
+
           {/* 1. BONUS QUESTIONS SECTION */}
           <section>
             <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-widest">Bonus Answer Keys</h3>
