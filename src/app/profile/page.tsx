@@ -24,35 +24,36 @@ export default async function ProfilePage() {
     .select('*', { count: 'exact', head: true })
     .eq('created_by', user.id)
 
-  // 2. Fetch all completed lobbies the user participated in
-  const { data: userLobbies } = await supabase
-    .from('lobby_members')
-    .select('lobby_id, lobbies!inner(status)')
+  // 2. THE FIX: Fetch directly from user_teams instead of lobby_members
+  // This ensures we are getting the exact calculated team scores for completed matches
+  const { data: myTeams } = await supabase
+    .from('user_teams')
+    .select('lobby_id, points_earned, lobbies!inner(status)')
     .eq('user_id', user.id)
     .eq('lobbies.status', 'completed')
 
-  const lobbyIds = userLobbies?.map(l => l.lobby_id) || []
+  const lobbyIds = myTeams?.map(t => t.lobby_id) || []
 
-  // 3. If they have completed lobbies, fetch ALL members of those lobbies to calculate ranks
+  // 3. Fetch ALL teams in these lobbies to calculate accurate ranks
   let wins = 0
   let totalPoints = 0
   const gamesPlayed = lobbyIds.length
 
   if (lobbyIds.length > 0) {
-    const { data: allMembers } = await supabase
-      .from('lobby_members')
-      .select('lobby_id, user_id, total_points')
+    const { data: allTeams } = await supabase
+      .from('user_teams')
+      .select('lobby_id, user_id, points_earned')
       .in('lobby_id', lobbyIds)
 
-    if (allMembers) {
+    if (allTeams) {
       lobbyIds.forEach(lId => {
-        const membersInLobby = allMembers.filter(m => m.lobby_id === lId)
+        const teamsInLobby = allTeams.filter(t => t.lobby_id === lId)
         
-        // Extract all unique scores in this lobby and sort descending (Dense Rank setup)
-        const uniqueScores = [...new Set(membersInLobby.map(m => m.total_points || 0))].sort((a, b) => b - a)
+        // Extract all unique scores in this lobby and sort descending
+        const uniqueScores = [...new Set(teamsInLobby.map(t => t.points_earned || 0))].sort((a, b) => b - a)
         
         // Find current user's score
-        const myScore = membersInLobby.find(m => m.user_id === user.id)?.total_points || 0
+        const myScore = teamsInLobby.find(t => t.user_id === user.id)?.points_earned || 0
         totalPoints += myScore
 
         // Calculate Dense Rank (1-based index)
@@ -72,13 +73,11 @@ export default async function ProfilePage() {
   const winRate = gamesPlayed === 0 ? 0 : Math.round((wins / gamesPlayed) * 100)
   const avgPoints = gamesPlayed === 0 ? 0 : Math.round(totalPoints / gamesPlayed)
 
-  // Grab Google Avatar or fallback
   const avatarUrl = user.user_metadata?.avatar_url
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0]
 
   return (
     <div className="flex min-h-screen flex-col bg-ipl-bg text-white">
-      {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-800 bg-ipl-card p-4 shadow-md px-6 md:px-10">
         <Link href="/dashboard" className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white">
           <ArrowLeft size={20} />
@@ -88,11 +87,9 @@ export default async function ProfilePage() {
 
       <main className="flex-1 overflow-y-auto p-4 md:p-10 max-w-5xl mx-auto w-full">
         
-        {/* User Identity Section */}
         <div className="flex flex-col md:flex-row items-center gap-6 mb-10 bg-ipl-card/50 p-8 rounded-2xl border border-gray-800">
           <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-ipl-gold shadow-[0_0_20px_rgba(234,179,8,0.2)]">
             {avatarUrl ? (
-              // THE FIX: Added unoptimized to prevent Next.js crashes with external Google URLs
               <Image src={avatarUrl} alt="Profile" fill unoptimized className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400">
@@ -106,7 +103,6 @@ export default async function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats Grid */}
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
           <Activity className="text-ipl-accent" /> Your Statistics
         </h2>
@@ -120,7 +116,6 @@ export default async function ProfilePage() {
           <StatCard icon={<UserIcon className="text-purple-400" />} label="Lobbies Hosted" value={(hostedCount || 0).toString()} />
         </div>
 
-        {/* Logout Section */}
         <div className="border-t border-gray-800 pt-8 flex justify-center md:justify-start">
           <form action={handleLogout}>
             <button 
@@ -139,7 +134,6 @@ export default async function ProfilePage() {
   )
 }
 
-// Small helper component for the stat boxes
 function StatCard({ icon, label, value, subValue }: { icon: React.ReactNode, label: string, value: string, subValue?: string }) {
   return (
     <div className="flex flex-col justify-center rounded-xl border border-gray-800 bg-ipl-card p-6 shadow-lg transition-all hover:border-gray-600">
