@@ -3,6 +3,7 @@
 import { createClient } from '@/src/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { scrapeAndCalculatePoints } from '@/src/lib/scraper'
 
 const ADMIN_EMAIL = 's.paresh2005@gmail.com'
 
@@ -20,10 +21,16 @@ export async function createMatch(formData: FormData) {
   if (team1 === team2) return { error: 'A team cannot play against itself!' }
   if (!matchTime) return { error: 'Please set a match time.' }
 
+  // THE TIMEZONE FIX: Explicitly append the IST offset (+05:30) 
+  // so Vercel's UTC servers don't offset your time by 5.5 hours.
+  const timeWithZone = matchTime.includes('+') || matchTime.includes('Z') 
+    ? matchTime 
+    : `${matchTime}+05:30`
+
   const { error } = await supabase.from('matches').insert({
     team1,
     team2,
-    match_time: new Date(matchTime).toISOString(),
+    match_time: new Date(timeWithZone).toISOString(),
     status: 'upcoming',
     bonus_questions: [
       { id: 'winner', text: 'Who will win the match?' },
@@ -155,10 +162,6 @@ export async function deleteMatch(matchId: number) {
   revalidatePath('/admin')
   return { success: true }
 }
-
-// ... [Keep existing code untouched] ...
-
-import { scrapeAndCalculatePoints } from '@/src/lib/scraper';
 
 // NEW ACTION: Fetch and map scores
 export async function syncCricbuzzScores(matchId: number) {
