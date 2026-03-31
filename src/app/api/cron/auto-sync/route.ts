@@ -27,14 +27,14 @@ export async function GET(request: Request) {
 
   // --- 1. THE AUTO-LIVE CHECK ---
   // Find matches that are automated, upcoming, and start within 20 mins (or have already started)
-  const twentyMinsFromNow = new Date(Date.now() + 5 * 60000).toISOString();
+const nowISO = new Date().toISOString();
   
   const { data: upcomingMatches } = await supabase
     .from('matches')
     .select('id')
     .eq('is_automated', true)
     .eq('status', 'upcoming')
-    .lte('match_time', twentyMinsFromNow);
+    .lte('match_time', nowISO);
 
   if (upcomingMatches && upcomingMatches.length > 0) {
     for (const match of upcomingMatches) {
