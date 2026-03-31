@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Plus, Minus, UserCircle, HelpCircle, X, CheckCircle2 } from 'lucide-react'
+import { Plus, Minus, UserCircle, HelpCircle, X, CheckCircle2, Loader2 } from 'lucide-react'
 import { lockTeam } from '@/src/app/actions/team' 
 import { useRouter } from 'next/navigation' 
 
@@ -20,10 +20,10 @@ export default function DraftInterface({
   const [squad, setSquad] = useState<Player[]>([])
   const [captainId, setCaptainId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showQuiz, setShowQuiz] = useState(false) // Trigger for the pop-up
+  const [showQuiz, setShowQuiz] = useState(false) 
   const router = useRouter()
+  const [isPending, startTransition] = useTransition() 
 
-  // --- BONUS PREDICTIONS STATE ---
   const [predictions, setPredictions] = useState<Record<string, string>>({
     winner: '',
     sixes: '',
@@ -43,7 +43,7 @@ export default function DraftInterface({
   const isQuizComplete = predictions.winner && predictions.sixes && predictions.pp_king
 
   const handleLockTeam = async () => {
-    if (squad.length !== REQUIRED_SQUAD_SIZE || !captainId || !isQuizComplete) return
+    if (squad.length !== REQUIRED_SQUAD_SIZE || !captainId || !isQuizComplete || isSubmitting || isPending) return
     setIsSubmitting(true)
     
     const playerIds = squad.map(p => p.id)
@@ -54,9 +54,15 @@ export default function DraftInterface({
       setIsSubmitting(false)
     } else {
       toast.success('Team & Predictions Locked!')
-      router.refresh() 
+      setShowQuiz(false)
+      
+      startTransition(() => {
+        router.refresh() 
+      })
     }
   }
+
+  const isLoading = isSubmitting || isPending;
 
   const batsmen = squad.filter(p => p.role === 'BAT')
   const allRounders = squad.filter(p => p.role === 'AR')
@@ -182,7 +188,7 @@ export default function DraftInterface({
               <h2 className="text-xl font-black text-ipl-gold flex items-center gap-2">
                 <HelpCircle size={20} /> BONUS PREDICTIONS
               </h2>
-              <button onClick={() => setShowQuiz(false)} className="text-gray-400 hover:text-white transition-colors">
+              <button onClick={() => setShowQuiz(false)} disabled={isLoading} className="text-gray-400 hover:text-white transition-colors disabled:opacity-50">
                 <X size={24} />
               </button>
             </div>
@@ -199,8 +205,9 @@ export default function DraftInterface({
                             {[...teamNames, ...(q !== 'winner' ? ['Tie'] : [])].map(opt => (
                                 <button 
                                     key={opt}
+                                    disabled={isLoading}
                                     onClick={() => setPredictions(prev => ({...prev, [q]: opt}))}
-                                    className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all ${predictions[q] === opt ? 'bg-ipl-gold text-black border-ipl-gold' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
+                                    className={`flex-1 py-2 text-xs font-black rounded-lg border transition-all disabled:opacity-50 ${predictions[q] === opt ? 'bg-ipl-gold text-black border-ipl-gold' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
                                 >
                                     {opt}
                                 </button>
@@ -212,10 +219,12 @@ export default function DraftInterface({
 
             <button 
                 onClick={handleLockTeam}
-                disabled={!isQuizComplete || isSubmitting}
+                disabled={!isQuizComplete || isLoading}
                 className="w-full mt-8 rounded-xl bg-ipl-gold py-4 font-black tracking-widest text-black shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-                {isSubmitting ? 'LOCKING...' : isQuizComplete ? (
+                {isLoading ? (
+                    <><Loader2 size={18} className="animate-spin"/> LOCKING...</>
+                ) : isQuizComplete ? (
                     <>CONFIRM & LOCK TEAM <CheckCircle2 size={18}/></>
                 ) : 'ANSWER ALL QUESTIONS'}
             </button>

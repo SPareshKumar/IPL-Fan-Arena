@@ -1,33 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { createLobby } from '@/src/app/actions/lobby'
-import { PlusCircle, X } from 'lucide-react'
+import { PlusCircle, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Match = { id: number; team1: string; team2: string; match_time: string }
 
 export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition() 
+  const [isSubmitting, setIsSubmitting] = useState(false) 
 
-  async function handleSubmit(formData: FormData) {
-    // FRONTEND FIX: The immediate lock. If it's already loading, ignore extra clicks completely.
-    if (isLoading) return 
+  // THE FIX: Standard React Form Event instead of Next.js Action
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault() // Prevents the browser from reloading
     
-    setIsLoading(true)
+    if (isSubmitting || isPending) return 
     
+    setIsSubmitting(true) // This now triggers instantly!
+    
+    // Extract the form data manually
+    const formData = new FormData(e.currentTarget)
     const result = await createLobby(formData)
     
     if (result?.error) {
       toast.error(result.error)
+      setIsSubmitting(false)
     } else {
       toast.success(`Lobby created! Invite code: ${result.inviteCode}`)
-      setIsOpen(false)
+      setIsOpen(false) 
+      
+      startTransition(() => {
+        router.refresh()
+      })
+      setIsSubmitting(false)
     }
-    
-    setIsLoading(false)
   }
+
+  const isLoading = isSubmitting || isPending
 
   return (
     <>
@@ -45,14 +58,13 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
             
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Create New Lobby</h2>
-              <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+              <button onClick={() => setIsOpen(false)} disabled={isLoading} className="text-gray-400 hover:text-white transition-colors disabled:opacity-50">
                 <X size={24} />
               </button>
             </div>
 
-            <form action={handleSubmit} className="space-y-5">
-              
-              {/* HIDDEN FIELD to safely pass the lobby type to your backend action */}
+            {/* THE FIX: Changed 'action' to 'onSubmit' */}
+            <form onSubmit={handleSubmit} className="space-y-5">
               <input type="hidden" name="type" value="single" />
 
               <div>
@@ -61,8 +73,9 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
                   name="name" 
                   type="text" 
                   required 
+                  disabled={isLoading}
                   placeholder="e.g., NSUT Hostellers"
-                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all"
+                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all disabled:opacity-50"
                 />
               </div>
 
@@ -71,7 +84,8 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
                 <select 
                   name="targetId" 
                   required
-                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all"
+                  disabled={isLoading}
+                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all disabled:opacity-50"
                 >
                   <option value="">-- Choose a Match --</option>
                   {matches.map((match) => (
@@ -85,13 +99,20 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className={`w-full rounded-lg p-3 font-bold transition-all mt-4 ${
+                className={`flex w-full items-center justify-center gap-2 rounded-lg p-3 font-bold transition-all mt-4 ${
                   isLoading 
                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
                     : 'bg-ipl-gold text-black hover:bg-yellow-400'
                 }`}
               >
-                {isLoading ? 'Creating...' : 'Create & Generate Code'}
+                {isLoading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create & Generate Code'
+                )}
               </button>
             </form>
 
