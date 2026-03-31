@@ -1,6 +1,7 @@
 import { createClient } from '@/src/lib/supabase/server'
 import { Trophy } from 'lucide-react'
 import LeaderboardRow from './LeaderboardRow'
+import LeaderboardListener from './LeaderboardListener' // <-- The invisible Realtime Listener
 
 export default async function LobbyLeaderboard({ 
   lobbyId, 
@@ -19,7 +20,7 @@ export default async function LobbyLeaderboard({
   // 2. Fetch Match Stats AND the Match Bonus Answers
   const { data: stats } = await supabase.from('match_player_stats').select('player_id, fantasy_points').eq('match_id', targetId)
   
-  // FIX: Fetch the actual bonus answers for this match
+  // Fetch the actual bonus answers for this match
   const { data: match } = await supabase.from('matches').select('bonus_answers').eq('id', targetId).single()
 
   // 3. Fetch User Profiles
@@ -40,7 +41,7 @@ export default async function LobbyLeaderboard({
 
   const correctAnswers = match?.bonus_answers || {}
 
-  // 5. THE UPDATED SCORING ENGINE
+  // 5. THE SCORING ENGINE
   const leaderboard = teams?.map(team => {
     let totalScore = 0
 
@@ -63,7 +64,7 @@ export default async function LobbyLeaderboard({
       }
     })
 
-    // B. FIX: Calculate Bonus Points on the fly
+    // B. Calculate Bonus Points on the fly
     const userPreds = team.bonus_predictions || {}
     Object.keys(correctAnswers).forEach(key => {
       const adminAns = String(correctAnswers[key] || '').trim().toLowerCase()
@@ -84,7 +85,11 @@ export default async function LobbyLeaderboard({
   }).sort((a, b) => b.score - a.score)
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-6">
+    <div className="mx-auto w-full max-w-4xl p-6 relative">
+      
+      {/* --- THE INVISIBLE WEBSOCKET ENGINE --- */}
+      <LeaderboardListener lobbyId={lobbyId} targetId={targetId} />
+
       <div className="mb-8 text-center">
         <h2 className="text-3xl font-black text-ipl-gold flex items-center justify-center gap-3">
           <Trophy size={32} />
