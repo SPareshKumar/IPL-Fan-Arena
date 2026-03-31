@@ -7,6 +7,7 @@ import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
 import LobbyGrid from '@/src/components/LobbyGrid'
 import Footer from '@/src/components/Footer'
+import ProfileNavButton from '@/src/components/ProfileNavButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -51,16 +52,11 @@ export default async function DashboardPage() {
           </div>
 
           <div className="md:hidden">
-            <Link href="/profile">
-              <div className="h-9 w-9 overflow-hidden rounded-full border-2 border-gray-700 transition-all hover:border-ipl-gold">
-                {user.user_metadata?.avatar_url ? (
-                  <Image src={user.user_metadata.avatar_url} alt="Profile" width={36} height={36} className="object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400"><Users size={16} /></div>
-                )}
-              </div>
-            </Link>
-          </div>
+  <ProfileNavButton 
+    variant="mobile" 
+    avatarUrl={user.user_metadata?.avatar_url} 
+  />
+</div>
         </div>
         
         {/* Sleek Fading Gradient Divider */}
@@ -117,22 +113,12 @@ export default async function DashboardPage() {
 
         {/* Desktop-Only User Avatar */}
         <div className="hidden md:block mt-auto shrink-0 border-t border-gray-800 pt-5 pb-2 bg-ipl-bg">
-          <Link href="/profile" className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-800/50 group">
-            <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-gray-700 transition-all group-hover:border-ipl-gold shadow-md shrink-0">
-              {user.user_metadata?.avatar_url ? (
-                <Image src={user.user_metadata.avatar_url} alt="Profile" width={40} height={40} className="object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gray-800 text-gray-400"><Users size={20} /></div>
-              )}
-            </div>
-            <div className="overflow-hidden">
-              <p className="truncate text-sm font-bold text-white transition-colors group-hover:text-ipl-gold">
-                {user.user_metadata?.full_name || 'My Profile'}
-              </p>
-              <p className="text-xs text-gray-400">View Profile</p>
-            </div>
-          </Link>
-        </div>
+  <ProfileNavButton 
+    variant="desktop" 
+    avatarUrl={user.user_metadata?.avatar_url} 
+    fullName={user.user_metadata?.full_name}
+  />
+</div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
