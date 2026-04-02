@@ -174,9 +174,9 @@ export default async function LandingPage() {
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1 md:space-y-2">
               <div className="flex items-center gap-2 text-ipl-gold"><ShieldAlert size={16} className="md:w-[18px] md:h-[18px]"/> <h3 className="font-bold text-sm md:text-base text-white">Game Modes</h3></div>
-              <p className="leading-relaxed text-xs md:text-sm text-gray-400">
-              Build your team, go head-to-head with friends, and earn extra points by answering the bonus questions.
-              </p>
+                            <p className="leading-relaxed text-xs md:text-sm text-gray-400">
+  Play a <strong className="text-white">Single Match Lobby</strong> for one game, or create a <strong className="text-white">Tournament Lobby</strong> and compete across the entire tournament.
+</p>
             </div>
 
             <div className="space-y-1 md:space-y-2">

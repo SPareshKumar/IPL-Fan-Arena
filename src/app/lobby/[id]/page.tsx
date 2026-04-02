@@ -7,6 +7,7 @@ import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 import LobbyModeration from '@/src/components/LobbyModeration'
 import LobbyListener from '@/src/components/LobbyListener'
 import Footer from '@/src/components/Footer'
+import LeaveLobbyButton from '@/src/components/LeaveLobbyButton'
 import TournamentHub from '@/src/components/TournamentHub' // <-- FIX 1: Removed double slash
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
@@ -90,18 +91,6 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   }
   // ====================================================================
 
-  // --- LEAVE LOBBY SERVER ACTION ---
-  async function handleLeaveLobby() {
-    'use server'
-    const supabaseAction = await createClient()
-    
-    // 1. Delete their team if they drafted one
-    await supabaseAction.from('user_teams').delete().eq('lobby_id', id).eq('user_id', user!.id)
-    // 2. Remove them from the lobby
-    await supabaseAction.from('lobby_members').delete().eq('lobby_id', id).eq('user_id', user!.id)
-    
-    redirect('/dashboard')
-  }
 
   // --- SMART ROUTER LOGIC ---
   const isMatchUpcoming = matchInfo?.status === 'upcoming'
@@ -162,18 +151,10 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {/* --- NORMAL USER LEAVE LOBBY BUTTON --- */}
+     {/* --- NORMAL USER LEAVE LOBBY BUTTON --- */}
       {!isCreator && (
         <div className="mt-8 mb-12 w-full max-w-7xl mx-auto px-4 flex justify-center md:justify-start">
-          <form action={handleLeaveLobby}>
-            <button 
-              type="submit" 
-              className="flex items-center gap-2 rounded-xl border border-red-900/50 bg-red-900/20 px-6 py-3 font-bold text-red-500 transition-all hover:bg-red-900/40 hover:text-red-400"
-            >
-              <LogOut size={18} />
-              LEAVE LOBBY
-            </button>
-          </form>
+          <LeaveLobbyButton lobbyId={lobby.id} />
         </div>
       )}
       <Footer />

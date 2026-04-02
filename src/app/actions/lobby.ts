@@ -131,3 +131,22 @@ export async function joinLobby(formData: FormData) {
 
   return { success: true, lobbyName: lobby.name }
 }
+
+// Add this to the bottom of src/app/actions/lobby.ts
+
+export async function leaveLobbyBackground(lobbyId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not logged in' }
+
+  // 1. Delete their drafted team (if it exists)
+  await supabase.from('user_teams').delete().eq('lobby_id', lobbyId).eq('user_id', user.id)
+  
+  // 2. Remove them from the lobby members list
+  await supabase.from('lobby_members').delete().eq('lobby_id', lobbyId).eq('user_id', user.id)
+
+  // THE FIX: Clear the cache on the server side instantly!
+  revalidatePath('/dashboard')
+
+  return { success: true }
+}
