@@ -3,13 +3,15 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import CopyInviteCode from '@/src/components/CopyInviteCode'
-import { Loader2 } from 'lucide-react' // Added Loader
+import { Loader2, Trophy } from 'lucide-react' 
+
+type FilterType = 'all' | 'upcoming' | 'live' | 'tournaments' | 'completed'
 
 export default function LobbyGrid({ lobbies }: { lobbies: any[] }) {
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'live' | 'completed'>('all')
+  const [filter, setFilter] = useState<FilterType>('all')
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [navigatingTo, setNavigatingTo] = useState<string | null>(null) // Track WHICH card was clicked
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null) 
 
   if (!lobbies || lobbies.length === 0) {
     return (
@@ -20,26 +22,47 @@ export default function LobbyGrid({ lobbies }: { lobbies: any[] }) {
     )
   }
 
-  const filteredLobbies = lobbies.filter(lobby => {
-    if (filter === 'all') return true
-    return lobby.matches?.status === filter
+  // 1. Process categories for filtering and sorting
+  const processedLobbies = lobbies.map(lobby => {
+    const isTournament = lobby.lobby_type === 'tournament'
+    const matchStatus = lobby.matches?.status || 'completed' // fallback
+    const category = isTournament ? 'tournaments' : matchStatus
+
+    return { ...lobby, category }
   })
 
-  // THE FIX: Intercept the click to show a loader before navigating
+  // 2. Filter based on pill selection
+  const filteredLobbies = processedLobbies.filter(lobby => {
+    if (filter === 'all') return true
+    return lobby.category === filter
+  })
+
+  // 3. Sort logic: Live > Upcoming > Tournaments > Completed
+  const sortOrder: Record<string, number> = { 
+    'live': 1, 
+    'upcoming': 2, 
+    'tournaments': 3, 
+    'completed': 4 
+  }
+  
+  if (filter === 'all') {
+    filteredLobbies.sort((a, b) => (sortOrder[a.category] || 99) - (sortOrder[b.category] || 99))
+  }
+
   const handleNavigation = (e: React.MouseEvent, lobbyId: string) => {
-    e.preventDefault() // Stop standard link behavior
-    setNavigatingTo(lobbyId) // Set spinner on this specific card
+    e.preventDefault() 
+    setNavigatingTo(lobbyId) 
     
     startTransition(() => {
-      router.push(`/lobby/${lobbyId}`) // Manually trigger the route change
+      router.push(`/lobby/${lobbyId}`) 
     })
   }
 
   return (
     <div>
-      {/* THE PILL SWITCH */}
+      {/* THE UPDATED PILL SWITCH */}
       <div className="mb-6 flex w-full sm:w-auto overflow-x-auto rounded-xl bg-gray-900/80 p-1 border border-gray-800 custom-scrollbar">
-        {(['all', 'upcoming', 'live', 'completed'] as const).map((f) => (
+        {(['all', 'upcoming', 'live', 'tournaments', 'completed'] as FilterType[]).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -62,43 +85,55 @@ export default function LobbyGrid({ lobbies }: { lobbies: any[] }) {
           </div>
         ) : (
           filteredLobbies.map((lobby) => {
-            const match = lobby.matches
             const isNavigatingHere = isPending && navigatingTo === lobby.id
+            const isTournament = lobby.lobby_type === 'tournament'
+            const match = lobby.matches
             
             return (
-              // Changed <Link> to an <a> tag with an onClick handler
               <a 
                 href={`/lobby/${lobby.id}`} 
                 onClick={(e) => handleNavigation(e, lobby.id)} 
                 key={lobby.id}
-                className={`relative flex h-full cursor-pointer flex-col justify-between rounded-xl border border-gray-800 bg-ipl-card p-5 md:p-6 transition-all hover:border-gray-500 hover:shadow-lg ${isNavigatingHere ? 'opacity-70 pointer-events-none' : ''}`}
+                className={`relative flex h-full cursor-pointer flex-col justify-between rounded-xl border p-5 md:p-6 transition-all hover:shadow-lg ${
+                  isTournament ? 'border-ipl-gold/30 bg-ipl-card hover:border-ipl-gold/60' : 'border-gray-800 bg-ipl-card hover:border-gray-500'
+                } ${isNavigatingHere ? 'opacity-70 pointer-events-none' : ''}`}
               >
                 <div>
-                  <div className="mb-4">
+                  <div className="mb-4 flex items-start justify-between">
                     <h3 className="truncate text-lg md:text-xl font-bold">{lobby.name}</h3>
+                    {isTournament && <Trophy size={18} className="text-ipl-gold shrink-0 mt-1" />}
                   </div>
                   
                   <div className="mb-4 md:mb-6 space-y-2">
-                    {match && (
-                      <div className="text-xs md:text-sm font-semibold text-gray-300">
-                        {match.team1} vs {match.team2}
-                      </div>
+                    {/* Render different info depending on the lobby type */}
+                    {isTournament ? (
+                       <div className="text-xs md:text-sm font-semibold text-ipl-gold bg-ipl-gold/10 inline-block px-2 py-1 rounded">
+                         Tournament Group
+                       </div>
+                    ) : (
+                      match && (
+                        <div className="text-xs md:text-sm font-semibold text-gray-300">
+                          {match.team1} vs {match.team2}
+                        </div>
+                      )
                     )}
                     
-                    <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">
-                      Match:
-                      <span className={`capitalize font-bold flex items-center gap-1 ${
-                        match?.status === 'live' ? 'text-red-500' : 
-                        match?.status === 'completed' ? 'text-green-500' : 
-                        'text-blue-400'
-                      }`}>
-                        {match?.status === 'live' && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
-                        {match?.status || 'Unknown'}
-                      </span>
-                    </div>
+                    {/* ONLY SHOW MATCH STATUS FOR SINGLE LOBBIES */}
+                    {!isTournament && (
+                      <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400 mt-2">
+                        Match:
+                        <span className={`capitalize font-bold flex items-center gap-1 ${
+                          lobby.category === 'live' ? 'text-red-500' : 
+                          lobby.category === 'completed' ? 'text-green-500' : 
+                          'text-blue-400'
+                        }`}>
+                          {lobby.category === 'live' && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+                          {lobby.category}
+                        </span>
+                      </div>
+                    )}
 
-                    {/* Stop the copy button from triggering the navigation! */}
-                    <div onClick={(e) => e.stopPropagation()}>
+                    <div onClick={(e) => e.stopPropagation()} className="pt-1">
                         <CopyInviteCode code={lobby.invite_code} />
                     </div>
                   </div>
@@ -110,7 +145,9 @@ export default function LobbyGrid({ lobbies }: { lobbies: any[] }) {
                         <Loader2 size={16} className="animate-spin" /> Loading...
                      </span>
                   ) : (
-                    <span className="font-semibold text-ipl-gold transition-colors hover:text-white">Enter Match &rarr;</span>
+                    <span className="font-semibold text-ipl-gold transition-colors hover:text-white">
+                      {isTournament ? 'Enter Group Dashboard →' : 'Enter Match →'}
+                    </span>
                   )}
                 </div>
               </a>

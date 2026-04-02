@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createLobby } from '@/src/app/actions/lobby'
-import { PlusCircle, X, Loader2 } from 'lucide-react'
+import { PlusCircle, X, Loader2, Trophy, Calendar } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Match = { id: number; team1: string; team2: string; match_time: string }
@@ -13,16 +13,17 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition() 
   const [isSubmitting, setIsSubmitting] = useState(false) 
+  
+  // NEW: State to track which mode they are creating
+  const [lobbyType, setLobbyType] = useState<'single' | 'tournament'>('single')
 
-  // THE FIX: Standard React Form Event instead of Next.js Action
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault() // Prevents the browser from reloading
+    e.preventDefault() 
     
     if (isSubmitting || isPending) return 
     
-    setIsSubmitting(true) // This now triggers instantly!
+    setIsSubmitting(true) 
     
-    // Extract the form data manually
     const formData = new FormData(e.currentTarget)
     const result = await createLobby(formData)
     
@@ -30,7 +31,7 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
       toast.error(result.error)
       setIsSubmitting(false)
     } else {
-      toast.success(`Lobby created! Invite code: ${result.inviteCode}`)
+      toast.success(`${lobbyType === 'tournament' ? 'Tournament' : 'Lobby'} created! Invite code: ${result.inviteCode}`)
       setIsOpen(false) 
       
       startTransition(() => {
@@ -63,38 +64,67 @@ export default function CreateLobbyModal({ matches }: { matches: Match[] }) {
               </button>
             </div>
 
-            {/* THE FIX: Changed 'action' to 'onSubmit' */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              <input type="hidden" name="type" value="single" />
+              {/* Dynamic hidden input to pass to Server Action */}
+              <input type="hidden" name="type" value={lobbyType} />
+
+              {/* MODE TOGGLE */}
+              <div className="flex gap-2 rounded-xl bg-gray-900 p-1 border border-gray-800">
+                <button 
+                  type="button" 
+                  onClick={() => setLobbyType('single')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${lobbyType === 'single' ? 'bg-ipl-gold text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <Calendar size={16} /> Single Match
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setLobbyType('tournament')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-colors ${lobbyType === 'tournament' ? 'bg-ipl-gold text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+                >
+                  <Trophy size={16} /> Tournament
+                </button>
+              </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Lobby Name</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  {lobbyType === 'tournament' ? 'Tournament Name' : 'Lobby Name'}
+                </label>
                 <input 
                   name="name" 
                   type="text" 
                   required 
                   disabled={isLoading}
-                  placeholder="e.g., NSUT Hostellers"
+                  placeholder={lobbyType === 'tournament' ? "e.g., The Office League" : "e.g., NSUT Hostellers"}
                   className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all disabled:opacity-50"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Select Fixture</label>
-                <select 
-                  name="targetId" 
-                  required
-                  disabled={isLoading}
-                  className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all disabled:opacity-50"
-                >
-                  <option value="">-- Choose a Match --</option>
-                  {matches.map((match) => (
-                    <option key={match.id} value={match.id}>
-                      {match.team1} vs {match.team2} 
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* ONLY SHOW FIXTURE SELECT IF SINGLE MATCH MODE */}
+              {lobbyType === 'single' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Select Fixture</label>
+                  <select 
+                    name="targetId" 
+                    required={lobbyType === 'single'}
+                    disabled={isLoading}
+                    className="w-full rounded-lg border border-gray-700 bg-ipl-card p-3 text-white focus:border-ipl-gold focus:outline-none focus:ring-1 focus:ring-ipl-gold transition-all disabled:opacity-50"
+                  >
+                    <option value="">-- Choose a Match --</option>
+                    {matches.map((match) => (
+                      <option key={match.id} value={match.id}>
+                        {match.team1} vs {match.team2} 
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {lobbyType === 'tournament' && (
+                <div className="rounded-lg bg-gray-900/50 border border-gray-800 p-4 text-xs text-gray-400 text-center">
+                  You can schedule matches for this tournament from the Group Dashboard after creating it.
+                </div>
+              )}
 
               <button 
                 type="submit" 

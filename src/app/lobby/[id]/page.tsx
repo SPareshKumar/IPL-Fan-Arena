@@ -7,6 +7,7 @@ import LobbyLeaderboard from '@/src/components/LobbyLeaderboard'
 import LobbyModeration from '@/src/components/LobbyModeration'
 import LobbyListener from '@/src/components/LobbyListener'
 import Footer from '@/src/components/Footer'
+import TournamentHub from '@/src/components/TournamentHub' // <-- FIX 1: Removed double slash
 
 export default async function LobbyDraftPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,6 +16,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Fetch the lobby. Note: We use maybeSingle() on matches because Tournaments might have target_id = null
   const { data: lobby, error } = await supabase
     .from('lobbies')
     .select('*, lobby_members!inner(user_id), matches(id, team1, team2, status)')
@@ -23,6 +25,23 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
     .single()
 
   if (error || !lobby) redirect('/dashboard')
+
+  const isCreator = user?.id === lobby?.created_by
+
+  // ====================================================================
+  // THE TRAFFIC DIRECTOR: Route Tournament Lobbies to the Hub
+  // ====================================================================
+  if (lobby.lobby_type === 'tournament') {
+    return (
+      <TournamentHub 
+        lobbyId={lobby.id} 
+        lobbyName={lobby.name}
+        inviteCode={lobby.invite_code}
+        currentUserId={user.id} 
+        isCreator={isCreator} 
+      />
+    )
+  }
 
   // @ts-ignore
   const matchInfo = lobby.matches
@@ -34,13 +53,14 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
     .eq('user_id', user.id)
     .maybeSingle()
 
+  // FIX 3: Added optional chaining (matchInfo?.team1) to prevent fatal crashes if match data is missing
   const { data: players } = await supabase
     .from('players')
     .select('*')
-    .in('team', [matchInfo.team1, matchInfo.team2])
+    .in('team', [matchInfo?.team1, matchInfo?.team2])
     .order('team') 
 
-  const isCreator = user?.id === lobby?.created_by
+  // FIX 2: Removed the duplicate `isCreator` declaration here
 
   // ====================================================================
   // THE FIX: Bulletproof way to get participants & their names
@@ -84,7 +104,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
   }
 
   // --- SMART ROUTER LOGIC ---
-  const isMatchUpcoming = matchInfo.status === 'upcoming'
+  const isMatchUpcoming = matchInfo?.status === 'upcoming'
   const shouldShowDraft = !existingTeam && isMatchUpcoming
 
   return (
@@ -100,7 +120,7 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
           <div>
             <h1 className="text-xl font-bold text-ipl-gold">{lobby.name}</h1>
             <span className="text-xs tracking-wider text-gray-400 uppercase">
-              {matchInfo.team1} vs {matchInfo.team2} • Single Match
+              {matchInfo?.team1} vs {matchInfo?.team2} • Single Match
             </span>
           </div>
         </div>
@@ -122,12 +142,12 @@ export default async function LobbyDraftPage({ params }: { params: Promise<{ id:
         <DraftInterface 
           players={players || []} 
           lobbyId={lobby.id} 
-          targetId={matchInfo.id} 
+          targetId={matchInfo?.id} 
         />
       ) : (
         <LobbyLeaderboard 
           lobbyId={lobby.id} 
-          targetId={matchInfo.id} 
+          targetId={matchInfo?.id} 
           currentUserId={user.id} 
         />
       )}

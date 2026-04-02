@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { scrapeAndCalculatePoints } from '@/src/lib/scraper';
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache'; // <-- 1. Import Next.js Cache control
+import { revalidatePath } from 'next/cache'; 
 
 export const dynamic = 'force-dynamic'; 
 
@@ -36,6 +36,7 @@ export async function GET(request: Request) {
     for (const match of upcomingMatches) {
       console.log(`🤖 [CRON] Auto-starting match ${match.id}`);
       await supabase.from('matches').update({ status: 'live' }).eq('id', match.id);
+      // This will only affect Single Lobbies. Tournaments have target_id = null and stay 'active'.
       await supabase.from('lobbies').update({ status: 'live' }).eq('target_id', match.id);
     }
   }
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
 
     await supabase.from('match_player_stats').upsert(upsertData, { onConflict: 'match_id, player_id' });
 
-    // --- 4. LIVE LEADERBOARD CALCULATION ---
+    // --- 4. LIVE LEADERBOARD CALCULATION (UPDATED FOR TOURNAMENTS) ---
     const { data: teams } = await supabase.from('user_teams').select('*').eq('target_id', match.id);
     
     if (teams && teams.length > 0) {
@@ -112,10 +113,22 @@ export async function GET(request: Request) {
 
         const liveScore = Math.round(total);
 
+        // A. Update the points for THIS specific match
         await supabase.from('user_teams').update({ points_earned: liveScore }).eq('id', team.id);
         
+        // B. Fetch ALL points this user has earned in this specific lobby across all matches
+        const { data: allUserTeams } = await supabase
+          .from('user_teams')
+          .select('points_earned')
+          .eq('lobby_id', team.lobby_id)
+          .eq('user_id', team.user_id);
+          
+        // C. Safely sum them together
+        const newTotalPoints = allUserTeams?.reduce((sum, current) => sum + (current.points_earned || 0), 0) || 0;
+
+        // D. Update the Master Leaderboard with the true total
         await supabase.from('lobby_members')
-          .update({ total_points: liveScore })
+          .update({ total_points: newTotalPoints })
           .eq('lobby_id', team.lobby_id)
           .eq('user_id', team.user_id);
       }

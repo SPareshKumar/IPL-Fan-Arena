@@ -15,7 +15,7 @@ export default async function LobbyLeaderboard({
   const supabase = await createClient()
 
   // 1. Fetch Drafted Teams (Include bonus_predictions)
-  const { data: teams } = await supabase.from('user_teams').select('*').eq('lobby_id', lobbyId)
+  const { data: teams } = await supabase.from('user_teams').select('*').eq('lobby_id', lobbyId).eq('target_id', targetId)
 
   // 2. Fetch Match Stats AND the Match Bonus Answers
   const { data: stats } = await supabase.from('match_player_stats').select('player_id, fantasy_points').eq('match_id', targetId)

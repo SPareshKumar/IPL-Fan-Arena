@@ -15,7 +15,7 @@ const ratelimit = new Ratelimit({
 })
 
 export async function createLobby(formData: FormData) {
-  // 1. RATE LIMIT CHECK: Do this FIRST to protect your database
+  // 1. RATE LIMIT CHECK
   const headersList = await headers()
   const ip = headersList.get('x-forwarded-for') ?? 'anonymous'
   const { success } = await ratelimit.limit(`create_lobby_${ip}`)
@@ -24,10 +24,7 @@ export async function createLobby(formData: FormData) {
     return { error: 'You are doing that too fast. Please wait a few seconds.' }
   }
 
-  // 2. Database connection
   const supabase = await createClient()
-  
-  // 3. Verify the user is actually logged in
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'You must be logged in.' }
 
@@ -37,9 +34,8 @@ export async function createLobby(formData: FormData) {
 
   if (!name || name.length < 3) return { error: 'Name must be at least 3 characters.' }
 
-  // --- BACKEND FIX: The 15-Second Cooldown Anti-Spam Check ---
+  // --- ANTI-SPAM CHECK ---
   const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString()
-
   const { data: recentLobby } = await supabase
     .from('lobbies')
     .select('id')
@@ -48,21 +44,20 @@ export async function createLobby(formData: FormData) {
     .gte('created_at', fifteenSecondsAgo)
     .maybeSingle()
 
-  if (recentLobby) {
-    return { error: 'You just created a lobby with this exact name! Please wait a moment.' }
-  }
-  // -------------------------------------------------------------
+  if (recentLobby) return { error: 'You just created a lobby with this exact name! Please wait a moment.' }
 
-  // 4. Generate a random 6-character alphanumeric code (e.g., "X7B9WQ")
   const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-  // 5. Insert the new lobby into the database
+  // --- THE TOURNAMENT FIX ---
+  // If it's a tournament, we don't bind it to a single match at creation.
+  const parsedTargetId = lobbyType === 'single' && targetId ? parseInt(targetId as string) : null;
+
   const { data: lobby, error: lobbyError } = await supabase
     .from('lobbies')
     .insert({
       name,
       lobby_type: lobbyType,
-      target_id: parseInt(targetId as string), 
+      target_id: parsedTargetId, 
       invite_code: inviteCode,
       created_by: user.id
     })
@@ -71,19 +66,13 @@ export async function createLobby(formData: FormData) {
 
   if (lobbyError) return { error: lobbyError.message }
 
-  // 6. Automatically add the creator to the lobby_members table
   const { error: memberError } = await supabase
     .from('lobby_members')
-    .insert({
-      user_id: user.id,
-      lobby_id: lobby.id
-    })
+    .insert({ user_id: user.id, lobby_id: lobby.id })
 
   if (memberError) return { error: memberError.message }
 
-  // 7. Tell Next.js to refresh the dashboard page to show the new lobby
   revalidatePath('/dashboard')
-
   return { success: true, inviteCode }
 }
 
