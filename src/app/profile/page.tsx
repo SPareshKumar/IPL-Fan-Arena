@@ -24,43 +24,55 @@ export default async function ProfilePage() {
     .select('*', { count: 'exact', head: true })
     .eq('created_by', user.id)
 
-  // 2. THE FIX: Fetch directly from user_teams instead of lobby_members
-  // This ensures we are getting the exact calculated team scores for completed matches
+  // 2. Fetch all drafted teams for the user
   const { data: myTeams } = await supabase
     .from('user_teams')
-    .select('lobby_id, points_earned, lobbies!inner(status)')
+    .select('id, lobby_id, target_id, points_earned')
     .eq('user_id', user.id)
-    .eq('lobbies.status', 'completed')
 
-  const lobbyIds = myTeams?.map(t => t.lobby_id) || []
+  // 3. Filter only for matches that have started getting points (Live, Locked, or Completed)
+  const { data: validMatches } = await supabase
+    .from('matches')
+    .select('id')
+    .in('status', ['live', 'locked', 'completed'])
 
-  // 3. Fetch ALL teams in these lobbies to calculate accurate ranks
+  const validMatchIds = new Set(validMatches?.map(m => m.id) || [])
+  const playedTeams = myTeams?.filter(t => validMatchIds.has(t.target_id)) || []
+
+  // 4. THE FIX: Standard Competition Ranking & Zero-Point Protection
   let wins = 0
   let totalPoints = 0
-  const gamesPlayed = lobbyIds.length
+  const gamesPlayed = playedTeams.length
 
-  if (lobbyIds.length > 0) {
+  if (gamesPlayed > 0) {
+    const uniqueLobbyIds = [...new Set(playedTeams.map(t => t.lobby_id))]
+    
+    // Fetch all teams for the lobbies the user played in
     const { data: allTeams } = await supabase
       .from('user_teams')
-      .select('lobby_id, user_id, points_earned')
-      .in('lobby_id', lobbyIds)
+      .select('lobby_id, target_id, user_id, points_earned')
+      .in('lobby_id', uniqueLobbyIds)
 
     if (allTeams) {
-      lobbyIds.forEach(lId => {
-        const teamsInLobby = allTeams.filter(t => t.lobby_id === lId)
-        
-        // Extract all unique scores in this lobby and sort descending
-        const uniqueScores = [...new Set(teamsInLobby.map(t => t.points_earned || 0))].sort((a, b) => b - a)
+      playedTeams.forEach(myTeam => {
+        // Isolate the exact contest: Same Lobby AND Same Match
+        const contestTeams = allTeams.filter(t => 
+          t.lobby_id === myTeam.lobby_id && 
+          t.target_id === myTeam.target_id
+        )
         
         // Find current user's score
-        const myScore = teamsInLobby.find(t => t.user_id === user.id)?.points_earned || 0
+        const myScore = myTeam.points_earned || 0
         totalPoints += myScore
 
-        // Calculate Dense Rank (1-based index)
-        const myRank = uniqueScores.indexOf(myScore) + 1
+        // Calculate Standard Competition Rank (1, 2, 2, 4)
+        // Your rank is mathematically just: (number of people who scored strictly higher than you) + 1
+        const higherScoringTeams = contestTeams.filter(t => (t.points_earned || 0) > myScore).length
+        const myRank = higherScoringTeams + 1
         
-        // A win is 1st, 2nd, or 3rd
-        if (myRank > 0 && myRank <= 3) {
+        // A win is 1st, 2nd, or 3rd place. 
+        // AND you must have actually earned > 0 points to prevent unstarted matches from counting as 1st place ties!
+        if (myRank <= 3 && myScore > 0) {
           wins++
         }
       })
