@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Plus, Minus, UserCircle, HelpCircle, X, CheckCircle2, Loader2 } from 'lucide-react'
+import { Plus, Minus, UserCircle, HelpCircle, X, CheckCircle2, Loader2, ChartBar, Users } from 'lucide-react'
 import { lockTeam } from '@/src/app/actions/team' 
+import { getMatchPlayerStats } from '@/src/app/actions/stats'
 import { useRouter } from 'next/navigation' 
 
 type Player = { id: number; name: string; team: string; role: string }
@@ -21,7 +22,14 @@ export default function DraftInterface({
   const [captainId, setCaptainId] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showQuiz, setShowQuiz] = useState(false) 
-  const [captainError, setCaptainError] = useState(false) // NEW: State to trigger the Shake animation
+  const [captainError, setCaptainError] = useState(false) 
+  
+  // NEW: State for switching between Draft List and Stats Panel
+  const [viewMode, setViewMode] = useState<'DRAFT' | 'STATS'>('DRAFT')
+  const [statsData, setStatsData] = useState<any[]>([])
+  const [isLoadingStats, setIsLoadingStats] = useState(false)
+  const [statRole, setStatRole] = useState<'BAT' | 'BOWL'>('BAT')
+
   const router = useRouter()
   const [isPending, startTransition] = useTransition() 
 
@@ -43,6 +51,18 @@ export default function DraftInterface({
 
   const isQuizComplete = predictions.winner && predictions.sixes && predictions.pp_king
 
+  // Fetch stats only when the user switches to the STATS tab for the first time
+  useEffect(() => {
+    if (viewMode === 'STATS' && statsData.length === 0) {
+      setIsLoadingStats(true)
+      const playerIds = players.map(p => p.id)
+      getMatchPlayerStats(playerIds).then(data => {
+        setStatsData(data)
+        setIsLoadingStats(false)
+      })
+    }
+  }, [viewMode, players, statsData.length])
+
   const handleLockTeam = async () => {
     if (squad.length !== REQUIRED_SQUAD_SIZE || !captainId || !isQuizComplete || isSubmitting || isPending) return
     setIsSubmitting(true)
@@ -56,10 +76,7 @@ export default function DraftInterface({
     } else {
       toast.success('Team & Predictions Locked!')
       setShowQuiz(false)
-      
-      startTransition(() => {
-        router.refresh() 
-      })
+      startTransition(() => { router.refresh() })
     }
   }
 
@@ -73,9 +90,7 @@ export default function DraftInterface({
     const isSelected = squad.some(p => p.id === player.id)
     if (isSelected) {
       setSquad(squad.filter(p => p.id !== player.id))
-      if (captainId === player.id) {
-        setCaptainId(null) 
-      }
+      if (captainId === player.id) setCaptainId(null) 
       return
     }
     if (squad.length >= REQUIRED_SQUAD_SIZE) return toast.error(`Squad full!`)
@@ -84,14 +99,22 @@ export default function DraftInterface({
     if (player.role === 'BOWL' && bowlers.length >= MAX_BOWL) return toast.error(`Max ${MAX_BOWL} Bowlers!`)
     
     setSquad([...squad, player])
-    setCaptainError(false) // Clear any errors when drafting
+    setCaptainError(false)
   }
 
   const filteredPlayers = useMemo(() => {
     return players.filter(p => (p.role === activeRole) && (activeTeam === 'BOTH' || p.team === activeTeam))
   }, [players, activeRole, activeTeam])
 
-  // THE FIX: The updated PitchPlayer with Pulse and Shake logic
+  // NEW: Processed stats for the cards
+  const displayStats = useMemo(() => {
+    if (statRole === 'BAT') {
+      return [...statsData].sort((a, b) => (b.runs || 0) - (a.runs || 0)).filter(s => s.runs > 0)
+    } else {
+      return [...statsData].sort((a, b) => (b.wickets || 0) - (a.wickets || 0)).filter(s => s.wickets > 0)
+    }
+  }, [statsData, statRole])
+
   const PitchPlayer = ({ player }: { player: Player }) => (
     <div className="relative flex flex-col items-center group">
       <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white/20 bg-ipl-card shadow-lg">
@@ -103,16 +126,16 @@ export default function DraftInterface({
       <button 
         onClick={() => {
           setCaptainId(captainId === player.id ? null : player.id)
-          setCaptainError(false) // Stop shaking if they click it!
+          setCaptainError(false) 
         }}
         className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-sm border transition-all ${
           captainId === player.id 
-            ? 'bg-ipl-gold border-yellow-200 text-black scale-110 shadow-[0_0_10px_rgba(234,179,8,0.8)] z-10' // Selected
+            ? 'bg-ipl-gold border-yellow-200 text-black scale-110 shadow-[0_0_10px_rgba(234,179,8,0.8)] z-10'
             : captainError
-              ? 'bg-red-600 border-red-300 text-white animate-shake ring-4 ring-red-500/50 scale-110 z-10' // ERROR: Shake & Red
+              ? 'bg-red-600 border-red-300 text-white animate-shake ring-4 ring-red-500/50 scale-110 z-10'
               : squad.length === REQUIRED_SQUAD_SIZE && !captainId
-                ? 'bg-gray-800 border-ipl-gold text-ipl-gold animate-pulse ring-2 ring-ipl-gold/50 z-10' // HINT: Gold Pulse
-                : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white' // NORMAL: Always visible now!
+                ? 'bg-gray-800 border-ipl-gold text-ipl-gold animate-pulse ring-2 ring-ipl-gold/50 z-10'
+                : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white'
         }`}
       >
         <span className="text-[10px] font-black">C</span>
@@ -120,12 +143,11 @@ export default function DraftInterface({
     </div>
   )
 
-  // THE FIX: Main button logic to trigger the shake
   const handleMainButtonClick = () => {
     if (squad.length === REQUIRED_SQUAD_SIZE && !captainId) {
       setCaptainError(true)
       toast.error("Tap the 'C' next to a drafted player to make them your Captain!")
-      setTimeout(() => setCaptainError(false), 800) // Stop shaking after 800ms
+      setTimeout(() => setCaptainError(false), 800)
       return
     }
     setShowQuiz(true)
@@ -133,7 +155,6 @@ export default function DraftInterface({
 
   return (
     <>
-      {/* Injecting a quick CSS animation for the shake effect without needing tailwind.config changes */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -145,63 +166,202 @@ export default function DraftInterface({
 
       <main className="grid flex-1 grid-cols-1 lg:grid-cols-2 relative">
         
-        {/* LEFT SIDE: PLAYER POOL */}
-        <div className="order-2 lg:order-1 flex flex-col h-[calc(100vh-80px)] border-r border-gray-800 bg-ipl-bg pt-6 px-4 md:px-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center justify-between">
-              Draft Players
-              <span className="bg-gray-800 text-ipl-gold px-3 py-1 rounded-full text-sm font-bold">
-                {squad.length}/{REQUIRED_SQUAD_SIZE} Selected
-              </span>
-            </h2>
-            
-            {/* Dynamic Hint above the draft pool */}
-            {squad.length === REQUIRED_SQUAD_SIZE && !captainId ? (
-              <p className="mt-3 rounded-lg border border-ipl-gold bg-ipl-gold/10 p-3 text-xs font-black text-ipl-gold animate-pulse flex items-center gap-2">
-                👉 Now choose your Captain (C) on the pitch!
-              </p>
-            ) : (
-              <p className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-xs font-semibold text-yellow-500">
-                ⚠️ Once locked, your team cannot be changed. Squads must be locked before match start.
-              </p>
-            )}
+        {/* LEFT SIDE: DYNAMIC PANEL (DRAFT OR STATS) */}
+        <div className="order-2 lg:order-1 flex flex-col h-[calc(100vh-80px)] border-r border-gray-800 bg-ipl-bg pt-4 px-4 md:px-6">
+          
+          {/* THE TOGGLE SWITCH - SEPARATED BUTTONS */}
+          <div className="mb-6 flex gap-3 md:gap-4 w-full">
+            <button 
+              onClick={() => setViewMode('DRAFT')} 
+              className={`flex-1 flex justify-center items-center gap-2 rounded-xl py-3 md:py-4 text-xs md:text-sm font-black transition-all border ${
+                viewMode === 'DRAFT' 
+                  ? 'bg-ipl-gold text-black border-ipl-gold shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]' 
+                  : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-600'
+              }`}
+            >
+              <Users size={18} /> DRAFT PLAYERS
+            </button>
+            <button 
+              onClick={() => setViewMode('STATS')} 
+              className={`flex-1 flex justify-center items-center gap-2 rounded-xl py-3 md:py-4 text-xs md:text-sm font-black transition-all border ${
+                viewMode === 'STATS' 
+                  ? 'bg-ipl-gold text-black border-ipl-gold shadow-[0_0_15px_rgba(234,179,8,0.15)] scale-[1.02]' 
+                  : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-600'
+              }`}
+            >
+              <ChartBar size={18} /> VIEW STATS
+            </button>
           </div>
 
-          {/* TEAM FILTER */}
-          <div className="mb-4 flex w-full rounded-xl bg-gray-900/80 p-1 border border-gray-800">
-            <button onClick={() => setActiveTeam('BOTH')} className={`flex-1 rounded-lg py-2 text-xs md:text-sm font-bold transition-all ${activeTeam === 'BOTH' ? 'bg-ipl-gold text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>BOTH TEAMS</button>
+          {/* ========================================= */}
+          {/* VIEW 1: DRAFTING INTERFACE */}
+          {/* ========================================= */}
+          {viewMode === 'DRAFT' && (
+            <div className="flex flex-col flex-1 overflow-hidden animate-in fade-in duration-300">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center justify-between">
+                  Player Pool
+                  <span className="bg-gray-800 text-ipl-gold px-3 py-1 rounded-full text-sm font-bold">
+                    {squad.length}/{REQUIRED_SQUAD_SIZE} Selected
+                  </span>
+                </h2>
+                {squad.length === REQUIRED_SQUAD_SIZE && !captainId ? (
+                  <p className="mt-3 rounded-lg border border-ipl-gold bg-ipl-gold/10 p-3 text-xs font-black text-ipl-gold animate-pulse flex items-center gap-2">
+                    👉 Now choose your Captain (C) on the pitch!
+                  </p>
+                ) : (
+                  <p className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-xs font-semibold text-yellow-500">
+                    ⚠️ Once locked, your team cannot be changed.
+                  </p>
+                )}
+              </div>
+
+              {/* TEAM FILTER - SEPARATED BUTTONS */}
+          <div className="mb-4 flex gap-2 md:gap-3 w-full">
+            <button 
+              onClick={() => setActiveTeam('BOTH')} 
+              className={`flex-1 rounded-xl py-2 md:py-3 text-xs md:text-sm font-black transition-all border ${
+                activeTeam === 'BOTH' 
+                  ? 'bg-ipl-gold text-black border-ipl-gold shadow-[0_0_10px_rgba(234,179,8,0.15)] scale-[1.02]' 
+                  : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-600'
+              }`}
+            >
+              BOTH TEAMS
+            </button>
             {teamNames.map(team => (
-              <button key={team} onClick={() => setActiveTeam(team)} className={`flex-1 rounded-lg py-2 text-xs md:text-sm font-bold transition-all ${activeTeam === team ? 'bg-ipl-gold text-black shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>{team}</button>
-            ))}
-          </div>
-
-          {/* ROLE TABS */}
-          <div className="mb-2 flex gap-2 border-b border-gray-800 pb-2">
-            {['BAT', 'AR', 'BOWL'].map(role => (
-              <button key={role} onClick={() => setActiveRole(role as any)} className={`relative flex-1 py-3 text-xs md:text-sm font-bold transition-colors ${activeRole === role ? 'text-ipl-gold' : 'text-gray-500 hover:text-gray-300'}`}>
-                {role} {activeRole === role && <div className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-ipl-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]"></div>}
+              <button 
+                key={team} 
+                onClick={() => setActiveTeam(team)} 
+                className={`flex-1 rounded-xl py-2 md:py-3 text-xs md:text-sm font-black uppercase transition-all border ${
+                  activeTeam === team 
+                    ? 'bg-ipl-gold text-black border-ipl-gold shadow-[0_0_10px_rgba(234,179,8,0.15)] scale-[1.02]' 
+                    : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 hover:border-gray-600'
+                }`}
+              >
+                {team}
               </button>
             ))}
           </div>
-          
-          <div className="flex-1 overflow-y-auto pr-2 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {filteredPlayers.length === 0 ? (
-              <div className="col-span-full flex h-40 flex-col items-center justify-center text-gray-500"><UserCircle size={40} className="mb-2 opacity-20" /><p className="text-sm font-medium">No players found.</p></div>
-            ) : (
-              filteredPlayers.map((player) => {
-                const isSelected = squad.some(p => p.id === player.id)
-                return (
-                  <div key={player.id} className={`flex items-center justify-between rounded-lg border p-3 md:p-4 transition-all ${isSelected ? 'border-ipl-gold bg-ipl-gold/10' : 'border-gray-800 bg-ipl-card hover:border-gray-600'}`}>
-                    <div><h3 className="font-bold text-white text-sm md:text-base">{player.name}</h3><div className="mt-1 flex gap-2 text-xs font-medium"><span className="text-gray-400">{player.team}</span><span className="text-ipl-accent">{player.role}</span></div></div>
-                    <button onClick={() => togglePlayer(player)} className={`rounded-md p-2 transition-colors ${isSelected ? 'bg-red-500/20 text-red-400' : 'bg-ipl-gold/20 text-ipl-gold'}`}>{isSelected ? <Minus size={18} /> : <Plus size={18} />}</button>
+
+              <div className="mb-2 flex gap-2 border-b border-gray-800 pb-2">
+                {['BAT', 'AR', 'BOWL'].map(role => (
+                  <button key={role} onClick={() => setActiveRole(role as any)} className={`relative flex-1 py-3 text-xs md:text-sm font-bold transition-colors ${activeRole === role ? 'text-ipl-gold' : 'text-gray-500 hover:text-gray-300'}`}>
+                    {role} {activeRole === role && <div className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-ipl-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]"></div>}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex-1 overflow-y-auto pr-2 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-3 content-start custom-scrollbar">
+                {filteredPlayers.length === 0 ? (
+                  <div className="col-span-full flex h-40 flex-col items-center justify-center text-gray-500"><UserCircle size={40} className="mb-2 opacity-20" /><p className="text-sm font-medium">No players found.</p></div>
+                ) : (
+                  filteredPlayers.map((player) => {
+                    const isSelected = squad.some(p => p.id === player.id)
+                    return (
+                      <div key={player.id} className={`flex items-center justify-between rounded-lg border p-3 md:p-4 transition-all ${isSelected ? 'border-ipl-gold bg-ipl-gold/10' : 'border-gray-800 bg-ipl-card hover:border-gray-600'}`}>
+                        <div><h3 className="font-bold text-white text-sm md:text-base">{player.name}</h3><div className="mt-1 flex gap-2 text-xs font-medium"><span className="text-gray-400">{player.team}</span><span className="text-ipl-accent">{player.role}</span></div></div>
+                        <button onClick={() => togglePlayer(player)} className={`rounded-md p-2 transition-colors ${isSelected ? 'bg-red-500/20 text-red-400' : 'bg-ipl-gold/20 text-ipl-gold'}`}>{isSelected ? <Minus size={18} /> : <Plus size={18} />}</button>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================= */}
+          {/* VIEW 2: THE NEW STATS PANEL */}
+          {/* ========================================= */}
+          {viewMode === 'STATS' && (
+            <div className="flex flex-col flex-1 overflow-hidden animate-in fade-in duration-300">
+              <div className="mb-4 flex gap-2 border-b border-gray-800 pb-2">
+                <button onClick={() => setStatRole('BAT')} className={`relative flex-1 py-3 text-xs md:text-sm font-bold transition-colors ${statRole === 'BAT' ? 'text-ipl-gold' : 'text-gray-500 hover:text-gray-300'}`}>
+                  TOP BATTERS
+                  {statRole === 'BAT' && <div className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-ipl-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]"></div>}
+                </button>
+                <button onClick={() => setStatRole('BOWL')} className={`relative flex-1 py-3 text-xs md:text-sm font-bold transition-colors ${statRole === 'BOWL' ? 'text-ipl-gold' : 'text-gray-500 hover:text-gray-300'}`}>
+                  TOP BOWLERS
+                  {statRole === 'BOWL' && <div className="absolute bottom-[-9px] left-0 h-[2px] w-full bg-ipl-gold shadow-[0_0_8px_rgba(234,179,8,0.8)]"></div>}
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 pb-6 flex flex-col gap-3 custom-scrollbar">
+                {isLoadingStats ? (
+                  <div className="flex h-40 flex-col items-center justify-center text-gray-500">
+                    <Loader2 size={40} className="animate-spin mb-2 opacity-50" />
+                    <p className="text-sm font-medium">Loading Database...</p>
                   </div>
-                )
-              })
-            )}
-          </div>
+                ) : displayStats.length === 0 ? (
+                  <div className="flex h-40 flex-col items-center justify-center text-gray-500 text-center">
+                    <ChartBar size={40} className="mb-2 opacity-20" />
+                    <p className="text-sm font-medium">No top {statRole === 'BAT' ? 'batting' : 'bowling'} stats found for this match.</p>
+                  </div>
+                ) : (
+                  displayStats.map((stat, index) => (
+                    <div key={stat.id} className="rounded-xl border border-gray-800 bg-ipl-card p-4 hover:border-gray-600 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-800 text-xs font-bold text-gray-400">
+                            #{index + 1}
+                          </span>
+                          <div>
+                            <h3 className="font-bold text-white text-base leading-tight">{stat.players.name}</h3>
+                            <span className="text-xs font-medium text-gray-400">{stat.players.team}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Conditional Rendering: Only show the stat if it's strictly > 0 */}
+                        {stat.runs > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">Runs</div>
+                            <div className="font-bold text-white">{stat.runs}</div>
+                          </div>
+                        )}
+                        {stat.batting_avg > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">Avg</div>
+                            <div className="font-bold text-white">{stat.batting_avg}</div>
+                          </div>
+                        )}
+                        {stat.strike_rate > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">SR</div>
+                            <div className="font-bold text-white">{stat.strike_rate}</div>
+                          </div>
+                        )}
+                        {stat.wickets > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">Wickets</div>
+                            <div className="font-bold text-ipl-accent">{stat.wickets}</div>
+                          </div>
+                        )}
+                        {stat.bowling_avg > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">Bowl Avg</div>
+                            <div className="font-bold text-white">{stat.bowling_avg}</div>
+                          </div>
+                        )}
+                        {stat.economy > 0 && (
+                          <div className="rounded bg-gray-900 p-2 text-center border border-gray-800/50">
+                            <div className="text-[10px] text-gray-500 uppercase font-black">Econ</div>
+                            <div className="font-bold text-white">{stat.economy}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* RIGHT SIDE: THE CRICKET PITCH */}
+        {/* ========================================= */}
+        {/* RIGHT SIDE: THE CRICKET PITCH (UNTouched!) */}
+        {/* ========================================= */}
         <div className="order-1 lg:order-2 relative flex flex-col h-[calc(100vh-80px)] border-l-8 border-ipl-bg bg-pitch-green p-6 shadow-2xl">
           <div className="pointer-events-none absolute inset-4 rounded-[100px] border border-white/20"></div>
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-32 -translate-x-1/2 -translate-y-1/2 border border-white/20 bg-[#e4d5b7]/5"></div>
