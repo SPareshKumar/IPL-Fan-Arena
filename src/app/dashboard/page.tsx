@@ -2,7 +2,7 @@ import { createClient } from '@/src/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Users, Info, Clock, ShieldAlert, Star, Calendar } from 'lucide-react'
+import { Users, Info, Clock, ShieldAlert, Star, Calendar, PlayCircle } from 'lucide-react'
 import CreateLobbyModal from '@/src/components/CreateLobbyModal'
 import JoinLobbyModal from '@/src/components/JoinLobbyModal'
 import LobbyGrid from '@/src/components/LobbyGrid'
@@ -31,10 +31,10 @@ export default async function DashboardPage() {
     .order('match_time', { ascending: true })
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen">
+    <div className="flex flex-col md:flex-row min-h-screen relative">
       
       {/* LEFT SIDEBAR - Locked to screen height */}
-      <aside className="flex w-full md:w-64 flex-col border-b md:border-b-0 md:border-r border-gray-800 bg-ipl-bg p-4 md:p-6 md:sticky md:top-0 md:h-screen">
+      <aside className="flex w-full md:w-64 flex-col border-b md:border-b-0 md:border-r border-gray-800 bg-ipl-bg p-4 md:p-6 md:sticky md:top-0 md:h-screen z-10">
         
         {/* Header Section */}
         <div className="flex items-center justify-between md:mb-5 shrink-0">
@@ -52,11 +52,11 @@ export default async function DashboardPage() {
           </div>
 
           <div className="md:hidden">
-  <ProfileNavButton 
-    variant="mobile" 
-    avatarUrl={user.user_metadata?.avatar_url} 
-  />
-</div>
+            <ProfileNavButton 
+              variant="mobile" 
+              avatarUrl={user.user_metadata?.avatar_url} 
+            />
+          </div>
         </div>
         
         {/* Sleek Fading Gradient Divider */}
@@ -113,26 +113,27 @@ export default async function DashboardPage() {
 
         {/* Desktop-Only User Avatar */}
         <div className="hidden md:block mt-auto shrink-0 border-t border-gray-800 pt-5 pb-2 bg-ipl-bg">
-  <ProfileNavButton 
-    variant="desktop" 
-    avatarUrl={user.user_metadata?.avatar_url} 
-    fullName={user.user_metadata?.full_name}
-  />
-</div>
+          <ProfileNavButton 
+            variant="desktop" 
+            avatarUrl={user.user_metadata?.avatar_url} 
+            fullName={user.user_metadata?.full_name}
+          />
+        </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-10">
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
         
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold">Active Lobbies</h2>
             <p className="mt-1 text-sm md:text-base text-gray-400">Select a lobby to draft your team.</p>
           </div>
-          
-          <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
-            <div className="flex-1 sm:flex-none"><JoinLobbyModal /></div>
-            <div className="flex-1 sm:flex-none"><CreateLobbyModal matches={scheduleMatches?.filter(m => m.status === 'upcoming') || []} /></div>
+          <div className="flex flex-wrap items-center gap-3 md:gap-4">
+            <div className="flex gap-2 sm:gap-4 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-none"><JoinLobbyModal /></div>
+              <div className="flex-1 sm:flex-none"><CreateLobbyModal matches={scheduleMatches?.filter(m => m.status === 'upcoming') || []} /></div>
+            </div>
           </div>
         </div>
 
@@ -150,8 +151,8 @@ export default async function DashboardPage() {
             <div className="space-y-1 md:space-y-2">
               <div className="flex items-center gap-2 text-ipl-gold"><ShieldAlert size={16} className="md:w-[18px] md:h-[18px]"/> <h3 className="font-bold text-sm md:text-base">Game Modes</h3></div>
               <p className="leading-relaxed text-xs md:text-sm text-gray-400">
-  Play a <strong className="text-white">Single Match Lobby</strong> for one game, or create a <strong className="text-white">Tournament Lobby</strong> and compete across the entire tournament.
-</p>
+                Play a <strong className="text-white">Single Match Lobby</strong> for one game, or create a <strong className="text-white">Tournament Lobby</strong> and compete across the entire tournament.
+              </p>
             </div>
 
             <div className="space-y-1 md:space-y-2">
@@ -177,6 +178,28 @@ export default async function DashboardPage() {
           </div>
         </div>
         <Footer />
+        
+        {/* --- THE FLOATING TUTORIAL BUTTON --- */}
+        <Link 
+          href="/tutorial"
+          className="group fixed bottom-6 right-6 md:bottom-10 md:right-10 z-50 flex items-center justify-center rounded-full border border-ipl-gold/50 bg-ipl-bg/90 p-3 px-5 md:p-4 md:px-4 shadow-[0_0_15px_rgba(234,179,8,0.2)] backdrop-blur-md transition-all duration-300 hover:scale-105 hover:border-ipl-gold md:hover:bg-ipl-gold hover:shadow-[0_0_25px_rgba(234,179,8,0.5)]"
+          title="Watch Gameplay Demos"
+        >
+          <div className="flex items-center justify-center overflow-hidden transition-all duration-300">
+            <PlayCircle className="w-5 h-5 md:w-7 md:h-7 text-ipl-gold transition-colors duration-300 md:group-hover:text-black shrink-0" />
+            
+            {/* MOBILE: Always visible pill text */}
+            <span className="ml-2 text-xs font-black text-ipl-gold tracking-widest md:hidden">
+              TUTORIAL
+            </span>
+            
+            {/* DESKTOP: Hover to expand text */}
+            <span className="hidden md:block w-0 opacity-0 overflow-hidden whitespace-nowrap text-sm font-black text-black transition-all duration-300 group-hover:w-[105px] group-hover:opacity-100 group-hover:ml-2 tracking-wide">
+              HOW TO PLAY
+            </span>
+          </div>
+        </Link>
+        
       </main>
     </div>
   )

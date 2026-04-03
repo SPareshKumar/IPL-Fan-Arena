@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import Footer from '@/src/components/Footer'
 import { History, Users, Info, Clock, ShieldAlert, Star, LogIn, Calendar } from 'lucide-react'
-
+import { PlayCircle, ChevronRight } from 'lucide-react'
 export default async function LandingPage() {
   const supabase = await createClient()
   
@@ -163,7 +163,29 @@ export default async function LandingPage() {
             </Link>
           </div>
         </div>
-
+<Link 
+  href="/tutorial" 
+  className="group relative mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl border border-ipl-gold/30 bg-gradient-to-r from-ipl-gold/10 via-black/20 to-transparent p-5 md:p-6 transition-all hover:border-ipl-gold/60 hover:shadow-[0_0_20px_rgba(234,179,8,0.1)]"
+>
+  <div className="flex items-center gap-4 md:gap-5">
+    <div className="flex h-12 w-12 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-full bg-ipl-gold text-black shadow-[0_0_15px_rgba(234,179,8,0.4)] transition-transform group-hover:scale-110">
+      <PlayCircle size={26} className="fill-black/10" />
+    </div>
+    <div>
+      <h3 className="text-lg md:text-xl font-black text-white transition-colors group-hover:text-ipl-gold">
+        Master the Arena
+      </h3>
+      <p className="mt-1 text-xs md:text-sm text-gray-400 max-w-lg leading-relaxed">
+        New here? Watch quick video guides on drafting teams, managing tournaments, and dominating the leaderboard.
+      </p>
+    </div>
+  </div>
+  
+  <div className="mt-2 md:mt-0 flex shrink-0 items-center gap-1 font-black text-ipl-gold md:pr-4">
+    WATCH DEMOS 
+    <ChevronRight size={20} className="transition-transform group-hover:translate-x-1" />
+  </div>
+</Link>
         {/* RULES SECTION */}
         <div className="rounded-xl md:rounded-2xl border border-gray-800 bg-ipl-card/50 p-5 md:p-8">
           <div className="mb-4 md:mb-6 flex items-center gap-2 border-b border-gray-800 pb-3 md:pb-4">
